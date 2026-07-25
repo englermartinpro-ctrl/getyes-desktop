@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GetYes — Copilote</title>
+    <link rel="stylesheet" href="overlay.css" />
+  </head>
+  <body>
+    <div id="card" class="card" data-state="off">
+      <header class="head">
+        <span id="dot" class="dot" title="déconnecté"></span>
+        <span class="brand">GetYes</span>
+        <span id="intent" class="intent"></span>
+        <button id="hide" class="icon-btn" title="Masquer (Ctrl+Maj+G)" aria-label="Masquer">
+          &#10005;
+        </button>
+      </header>
+
+      <div class="body">
+        <p id="phrase" class="phrase placeholder">Connexion au copilote…</p>
+      </div>
+
+      <footer class="foot">
+        <div id="meta" class="meta"></div>
+        <form id="devform" class="devform" hidden>
+          <input
+            id="devinput"
+            class="devinput"
+            type="text"
+            placeholder="Simuler une phrase du prospect… (Entrée)"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </form>
+      </footer>
+    </div>
+
+    <script src="overlay.js"></script>
+  </body>
+</html>

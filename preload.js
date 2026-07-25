@@ -8,10 +8,17 @@
 // Plus tard, on ajoutera ici des méthodes contrôlées : démarrer/arrêter le
 // runtime Python, connaître l'état du WebSocket ws://127.0.0.1:8765, etc.
 
-const { contextBridge } = require("electron");
+const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("getyesDesktop", {
   isDesktop: true,
   version: "0.1.0",
   platform: process.platform,
+  // Pilotage du copilote depuis le SaaS (bouton « Lancer le copilote »). Le
+  // process principal applique d'abord le gate Auth/abonnement avant de lancer.
+  copilot: {
+    start: () => ipcRenderer.invoke("copilot:start"),
+    stop: () => ipcRenderer.invoke("copilot:stop"),
+    toggle: () => ipcRenderer.invoke("copilot:toggle"),
+  },
 });
