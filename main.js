@@ -13,6 +13,8 @@ const {
   screen,
   globalShortcut,
   ipcMain,
+  net,
+  Notification,
 } = require("electron");
 const path = require("path");
 const runtime = require("./runtime/manager");
@@ -148,8 +150,58 @@ function createOverlayWindow() {
   return overlayWindow;
 }
 
-// Lance le runtime (mock|real) + affiche l'overlay SANS voler le focus de l'appel.
-function startCopilot() {
+// Vérifie CÔTÉ SERVEUR (endpoint SaaS) que l'utilisateur a le droit de lancer le
+// runtime — il consomme des ressources IA payantes. Réutilise la session de la
+// fenêtre (cookies getyes.app). Renvoie null si le check est injoignable (réseau).
+async function checkEntitlement() {
+  try {
+    const res = await net.fetch(`${SAAS_ORIGIN}/api/desktop/entitlement`, {
+      session: mainWindow?.webContents.session,
+      cache: "no-store",
+    });
+    if (!res.ok) return { authenticated: false, canUseRuntime: false };
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function notifier(titre, corps) {
+  try {
+    new Notification({ title: titre, body: corps }).show();
+  } catch {
+    /* notifications indispo : silencieux */
+  }
+}
+
+// Lance le runtime (mock|real) + affiche l'overlay SANS voler le focus de l'appel,
+// APRÈS le gate Auth/abonnement.
+async function startCopilot() {
+  const isMock = (process.env.GETYES_RUNTIME_MODE || "mock") === "mock";
+  // Gate Auth/abonnement : appliqué en mode RÉEL uniquement (le runtime brûle des
+  // ressources IA payantes). En mock (dev), rien n'est consommé → pas de gate,
+  // pour pouvoir tester l'overlay sans être connecté dans la fenêtre.
+  if (!isMock) {
+    const ent = await checkEntitlement();
+    if (ent === null) {
+      // Check réseau impossible → REFUSÉ (ne jamais lancer pour un non-vérifié).
+      notifier("Copilote GetYes", "Service injoignable — réessaie dans un instant.");
+      return { ok: false, reason: "unreachable" };
+    }
+    if (!ent.canUseRuntime) {
+      notifier(
+        "Copilote GetYes",
+        ent.authenticated
+          ? "Ton plan n'inclut pas le copilote d'appel."
+          : "Connecte-toi pour lancer le copilote.",
+      );
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+      return { ok: false, reason: "entitlement" };
+    }
+  }
   const res = runtime.start();
   createOverlayWindow().showInactive();
   return res;
