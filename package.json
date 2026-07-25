@@ -2,14 +2,44 @@
   "name": "getyes-desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "GetYes — application de bureau (coquille Electron : SaaS embarqué + runtime local à venir)",
+  "description": "GetYes — application de bureau (Electron : SaaS embarqué + runtime local à venir)",
   "main": "main.js",
   "author": "GetYes",
   "license": "UNLICENSED",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.getyes.app",
+    "productName": "GetYes",
+    "files": [
+      "main.js",
+      "preload.js",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/app-icon-v3.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "GetYes"
+    },
+    "protocols": [
+      {
+        "name": "GetYes Protocol",
+        "schemes": [
+          "getyes"
+        ]
+      }
+    ]
   },
   "devDependencies": {
-    "electron": "^43.2.0"
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
   }
 }
