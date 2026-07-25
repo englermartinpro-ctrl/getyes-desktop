@@ -27,7 +27,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 680,
     title: "GetYes",
-    icon: path.join(__dirname, "assets", "icon.png"), // logo dans la fenêtre/barre des tâches
+    icon: path.join(__dirname, "assets", "app-icon-v2.ico"), // logo (fenêtre + barre des tâches, .ico = mieux géré par Windows)
     backgroundColor: "#000000", // évite le flash blanc pendant le chargement
     autoHideMenuBar: true, // pas de barre de menu visible (look app)
     webPreferences: {
@@ -38,6 +38,10 @@ function createWindow() {
   });
 
   mainWindow.loadURL(SAAS_URL);
+
+  // Garde le titre de fenêtre « GetYes » (sinon il prend le <title> marketing
+  // de la page « …L'IA qui obtient le oui »). Plus « app », moins « site ».
+  mainWindow.on("page-title-updated", (e) => e.preventDefault());
 
   // Liens externes (Stripe, docs, et surtout l'OAuth Google — qui REFUSE de
   // s'ouvrir dans une webview embarquée) → navigateur système, pas la fenêtre.
@@ -53,6 +57,9 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Identité Windows de l'app : regroupe la fenêtre sous NOTRE icône dans la
+  // barre des tâches (au lieu de celle d'Electron par défaut).
+  app.setAppUserModelID("com.getyes.app");
   Menu.setApplicationMenu(null); // retire le menu File/Edit natif (look app propre)
   createWindow();
 
