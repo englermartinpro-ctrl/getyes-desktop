@@ -27,7 +27,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 680,
     title: "GetYes",
-    icon: path.join(__dirname, "assets", "app-icon-v2.ico"), // logo (fenêtre + barre des tâches, .ico = mieux géré par Windows)
+    icon: path.join(__dirname, "assets", "app-icon-v3.ico"), // logo (fenêtre + barre des tâches, .ico = mieux géré par Windows)
     backgroundColor: "#000000", // évite le flash blanc pendant le chargement
     autoHideMenuBar: true, // pas de barre de menu visible (look app)
     webPreferences: {
@@ -59,7 +59,7 @@ function createWindow() {
 app.whenReady().then(() => {
   // Identité Windows de l'app : regroupe la fenêtre sous NOTRE icône dans la
   // barre des tâches (au lieu de celle d'Electron par défaut).
-  app.setAppUserModelID("com.getyes.app");
+  app.setAppUserModelId("com.getyes.app");
   Menu.setApplicationMenu(null); // retire le menu File/Edit natif (look app propre)
   createWindow();
 
