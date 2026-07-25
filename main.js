@@ -1,24 +1,48 @@
-// GetYes Desktop — processus principal Electron (v0.1)
+// GetYes Desktop — processus principal Electron
 // -----------------------------------------------------------------------------
-// Rôle de cette v0.1 : ouvrir UNE fenêtre native qui embarque le SaaS GetYes,
-// avec la session gardée entre les lancements (comme l'app Claude). Le lancement
-// du runtime Python (le brain) + l'overlay flottant + le handshake d'auth
-// viendront dans les étapes suivantes (2, 3, 4).
-//
-// La session par défaut d'Electron est DÉJÀ persistée sur disque → l'utilisateur
-// reste connecté d'un lancement à l'autre. Rien de spécial à faire pour ça.
+// Fenêtre native qui embarque le SaaS GetYes (session persistée). Gère aussi le
+// flux OAuth Google : Google REFUSE l'auth dans une webview embarquée, donc on
+// l'ouvre dans le navigateur système et on récupère la session via le protocole
+// getyes:// (deep-link). Le lancement du runtime Python viendra en v0.2.
 
 const { app, BrowserWindow, Menu, shell } = require("electron");
 const path = require("path");
 
-// L'app desktop ouvre LE PRODUIT (le SaaS après connexion), PAS la landing
-// marketing. On charge donc /dashboard : si l'utilisateur est déjà connecté
-// (session gardée) il arrive direct dans l'app ; sinon la middleware du SaaS le
-// redirige vers /login. La landing (/) reste réservée au web.
-// En dev : GETYES_URL=http://localhost:3000/dashboard npm start
+// L'app ouvre LE PRODUIT (SaaS après connexion), PAS la landing. /dashboard →
+// app si connecté, sinon /login. En dev : GETYES_URL=http://localhost:3000/dashboard
 const SAAS_URL = process.env.GETYES_URL || "https://www.getyes.app/dashboard";
+const SAAS_ORIGIN = new URL(SAAS_URL).origin;
+// Marqueur ajouté au User-Agent : le SaaS détecte le desktop (→ OAuth via
+// navigateur + redirect getyes://) sans rien deviner.
+const UA_MARKER = "GetYesDesktop/0.1";
 
 let mainWindow;
+
+// Retour OAuth : getyes://auth-callback?code=... → on recharge /auth/callback
+// DANS la fenêtre (là où vit le code_verifier PKCE posé au clic « Google »),
+// qui échange le code contre la session puis redirige vers le dashboard.
+function handleDeepLink(url) {
+  if (!url || !url.startsWith("getyes://") || !mainWindow) return;
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return;
+  }
+  const err = parsed.searchParams.get("error");
+  const code = parsed.searchParams.get("code");
+  if (err) {
+    mainWindow.loadURL(
+      `${SAAS_ORIGIN}/login?error=${encodeURIComponent("Connexion annulée. Réessaie.")}`,
+    );
+  } else if (code) {
+    mainWindow.loadURL(
+      `${SAAS_ORIGIN}/auth/callback?code=${encodeURIComponent(code)}`,
+    );
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.focus();
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -27,49 +51,93 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 680,
     title: "GetYes",
-    icon: path.join(__dirname, "assets", "app-icon-v3.ico"), // logo (fenêtre + barre des tâches, .ico = mieux géré par Windows)
-    backgroundColor: "#000000", // évite le flash blanc pendant le chargement
-    autoHideMenuBar: true, // pas de barre de menu visible (look app)
+    icon: path.join(__dirname, "assets", "app-icon-v3.ico"),
+    backgroundColor: "#000000", // évite le flash blanc au chargement
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
-      contextIsolation: true, // le SaaS ne voit PAS Node — sécurité
+      contextIsolation: true,
       nodeIntegration: false,
     },
   });
 
+  // UA marqueur AVANT le premier load (le SaaS le lit dès /login).
+  mainWindow.webContents.setUserAgent(
+    `${mainWindow.webContents.getUserAgent()} ${UA_MARKER}`,
+  );
+
   mainWindow.loadURL(SAAS_URL);
 
-  // Garde le titre de fenêtre « GetYes » (sinon il prend le <title> marketing
-  // de la page « …L'IA qui obtient le oui »). Plus « app », moins « site ».
+  // Titre figé « GetYes » (sinon il prend le <title> marketing de la page).
   mainWindow.on("page-title-updated", (e) => e.preventDefault());
 
-  // Liens externes (Stripe, docs, et surtout l'OAuth Google — qui REFUSE de
-  // s'ouvrir dans une webview embarquée) → navigateur système, pas la fenêtre.
+  // Fenêtres popup (target=_blank, Stripe…) → navigateur système.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };
   });
 
-  // F12 = devtools (phase de dev uniquement).
+  // OAuth Google : la navigation top-level vers l'écran d'autorisation Supabase/
+  // Google est détournée vers le navigateur système (Google bloque la webview).
+  // Le retour arrive via getyes:// (handleDeepLink). Les autres navigations
+  // (getyes.app/…, /auth/callback) passent normalement.
+  const detourneOAuth = (event, url) => {
+    if (
+      url.includes("/auth/v1/authorize") ||
+      url.startsWith("https://accounts.google.com")
+    ) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  };
+  mainWindow.webContents.on("will-navigate", detourneOAuth);
+  mainWindow.webContents.on("will-redirect", detourneOAuth);
+
+  // F12 = devtools (phase de dev).
   mainWindow.webContents.on("before-input-event", (_event, input) => {
     if (input.key === "F12") mainWindow.webContents.toggleDevTools();
   });
 }
 
-app.whenReady().then(() => {
-  // Identité Windows de l'app : regroupe la fenêtre sous NOTRE icône dans la
-  // barre des tâches (au lieu de celle d'Electron par défaut).
-  app.setAppUserModelId("com.getyes.app");
-  Menu.setApplicationMenu(null); // retire le menu File/Edit natif (look app propre)
-  createWindow();
+// Instance UNIQUE : indispensable pour le deep-link. Quand le navigateur ouvre
+// getyes://…, Windows relance l'app avec l'URL en argument → le verrou renvoie
+// cet argument à l'instance déjà vivante (celle qui a la fenêtre + le verifier).
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  // Enregistre getyes:// auprès de l'OS (en dev : exe Electron + dossier app).
+  if (process.defaultApp && process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient("getyes", process.execPath, [
+      path.resolve(process.argv[1]),
+    ]);
+  } else {
+    app.setAsDefaultProtocolClient("getyes");
+  }
 
-  app.on("activate", () => {
-    // macOS : recrée une fenêtre au clic sur le dock si tout est fermé.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  // Windows/Linux : le retour getyes://… arrive en argument d'une 2e instance.
+  app.on("second-instance", (_event, argv) => {
+    const link = argv.find((a) => a.startsWith("getyes://"));
+    if (link) handleDeepLink(link);
   });
-});
+  // macOS : via open-url.
+  app.on("open-url", (_event, url) => handleDeepLink(url));
 
-app.on("window-all-closed", () => {
-  // Windows/Linux : quitter quand toutes les fenêtres sont fermées.
-  if (process.platform !== "darwin") app.quit();
-});
+  app.whenReady().then(() => {
+    app.setAppUserModelId("com.getyes.app"); // icône barre des tâches
+    Menu.setApplicationMenu(null);
+    createWindow();
+
+    // Cas où l'app est lancée À FROID par un getyes:// (l'URL est dans argv).
+    const initial = process.argv.find((a) => a.startsWith("getyes://"));
+    if (initial) handleDeepLink(initial);
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  });
+
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") app.quit();
+  });
+}
