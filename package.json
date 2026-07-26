@@ -17,7 +17,8 @@
       {
         "provider": "github",
         "owner": "englermartinpro-ctrl",
-        "repo": "getyes-desktop"
+        "repo": "getyes-desktop",
+        "releaseType": "release"
       }
     ],
     "win": {
