@@ -38,13 +38,13 @@ function killTree(pid) {
   }
 }
 
-// FILET DE SÉCURITÉ ABSOLU : tue TOUT process runtime encore vivant, identifié
-// par sa ligne de commande — même orphelin d'un crash ou d'un force-close.
-// Garantit que l'oreille ne peut JAMAIS continuer à écouter sans l'app.
-function sweepKill() {
+// FILET DE SÉCURITÉ : tue les process runtime identifiés par leur ligne de
+// commande — même orphelins d'un crash ou d'un force-close. Le motif décide de
+// la portée : TOUT (cerveau + oreille) au démarrage/arrêt, ou l'OREILLE SEULE
+// (sans toucher le cerveau) quand on coupe juste l'écoute.
+function sweepKillMatching(pattern) {
   if (process.platform !== "win32") return;
-  const ps =
-    'Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "python.exe" -and ($_.CommandLine -match "closepilot_ui_server|_ecoute_on|_test_micro_on|closepilot_live") } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }';
+  const ps = `Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "python.exe" -and ($_.CommandLine -match "${pattern}") } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`;
   try {
     execFileSync("powershell", ["-NoProfile", "-Command", ps], {
       stdio: "ignore",
@@ -53,6 +53,17 @@ function sweepKill() {
   } catch {
     /* rien à tuer */
   }
+}
+// Portée TOTALE : garantit qu'aucun composant du runtime ne survit à l'app.
+function sweepKill() {
+  sweepKillMatching(
+    "closepilot_ui_server|_ecoute_on|_test_micro_on|closepilot_live",
+  );
+}
+// Portée OREILLE : coupe l'écoute (et son transcripteur enfant) sans jamais
+// atteindre "closepilot_ui_server" — le cerveau reste chaud pour re-écouter.
+function sweepKillEar() {
+  sweepKillMatching("_ecoute_on|_test_micro_on|closepilot_live");
 }
 
 // Env du brain — aligné sur la spec d'Eliott (réponse du 26/07). Les CLÉS API
@@ -181,6 +192,26 @@ function startEar() {
   procs.push(ear);
 }
 
+// Coupe l'OREILLE seule (fin d'appel / pause) : tue le(s) process _gyEar et leur
+// arbre, laisse le cerveau tourner. Idempotent (rien à couper = no-op).
+function stopEar() {
+  const keep = [];
+  for (const p of procs) {
+    if (p._gyEar) {
+      killTree(p.pid);
+      try {
+        p.kill();
+      } catch {
+        /* déjà mort */
+      }
+    } else {
+      keep.push(p);
+    }
+  }
+  procs = keep;
+  sweepKillEar(); // filet ciblé : aucune oreille orpheline, cerveau intact
+}
+
 function stop() {
   for (const p of procs) {
     killTree(p.pid); // tue le process ET tout son arbre
@@ -195,6 +226,8 @@ function stop() {
 }
 
 const isRunning = () => procs.length > 0;
+// L'oreille (écoute) tourne-t-elle ? (≠ cerveau seul) — pilote l'UI/la tray.
+const earRunning = () => procs.some((p) => p._gyEar);
 const setLogHandler = (fn) => {
   onLog = typeof fn === "function" ? fn : () => {};
 };
@@ -203,7 +236,9 @@ module.exports = {
   start,
   stop,
   startEar,
+  stopEar,
   isRunning,
+  earRunning,
   setLogHandler,
   config,
   sweepKill,

@@ -5,4 +5,6 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("overlayAPI", {
   hide: () => ipcRenderer.send("overlay:hide"),
+  // Croix « terminer l'appel » : enregistre le bilan puis coupe l'écoute + referme.
+  endCall: () => ipcRenderer.send("overlay:endCall"),
 });

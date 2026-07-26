@@ -125,6 +125,22 @@ function createWindow() {
   });
 }
 
+// Croix « terminer l'appel » posée dans le coin de l'overlay. Rouge au survol
+// (action franche). Appelle overlayAPI.endCall (preload) → reset_session + stop.
+const OVERLAY_CROSS_JS = `(function(){
+  if (document.getElementById('gyEndCall')) return;
+  var b = document.createElement('button');
+  b.id = 'gyEndCall';
+  b.type = 'button';
+  b.title = "Terminer l'appel — enregistre le bilan";
+  b.textContent = '\\u2715';
+  b.style.cssText = 'position:fixed;top:7px;right:9px;z-index:2147483647;width:22px;height:22px;padding:0;border:none;border-radius:6px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);font:600 12px/22px system-ui,sans-serif;text-align:center;cursor:pointer;-webkit-app-region:no-drag;app-region:no-drag;';
+  b.addEventListener('mouseenter', function(){ b.style.background='rgba(239,68,68,.9)'; b.style.color='#fff'; });
+  b.addEventListener('mouseleave', function(){ b.style.background='rgba(255,255,255,.08)'; b.style.color='rgba(255,255,255,.7)'; });
+  b.addEventListener('click', function(){ if (window.overlayAPI && window.overlayAPI.endCall) window.overlayAPI.endCall(); });
+  document.body.appendChild(b);
+})();`;
+
 // ─── Overlay copilote ────────────────────────────────────────────────────────
 // Fenêtre flottante, sans cadre, transparente, toujours au-dessus (même sur Zoom).
 // Charge l'UI locale en file:// → passe la garde d'origine du serveur d'Eliott
@@ -170,6 +186,12 @@ function createOverlayWindow() {
       search: "dev=1",
     });
   }
+  // Croix « fin d'appel » injectée par-dessus l'overlay (sans modifier les fichiers
+  // d'Eliott — même principe que le cockpit). Toujours visible, même hors du SaaS :
+  // c'est le seul arrêt garanti pendant un appel. Idempotent (ne se rajoute pas).
+  overlayWindow.webContents.on("did-finish-load", () => {
+    overlayWindow?.webContents.executeJavaScript(OVERLAY_CROSS_JS).catch(() => {});
+  });
   overlayWindow.on("closed", () => (overlayWindow = null));
   return overlayWindow;
 }
@@ -315,10 +337,27 @@ function startBridge() {
       bridgeWs = ws;
     });
     ws.on("message", (raw) => {
+      let d;
       try {
-        if (JSON.parse(raw.toString()).type === "ready") setCopilotState("ready");
+        d = JSON.parse(raw.toString());
       } catch {
-        /* trame non-JSON ignorée */
+        return; // trame non-JSON ignorée
+      }
+      if (d.type === "ready") setCopilotState("ready");
+      // LE bouton du cockpit (ou l'overlay) bascule l'écoute → le serveur diffuse
+      // audio_toggle à tous les clients. C'est NOTRE process qui possède l'oreille
+      // (Python) et l'overlay : on les démarre/arrête ici. Zéro écoute tant que ce
+      // signal n'arrive pas — le cockpit ne fait tourner que le cerveau.
+      if (d.type === "audio_toggle") {
+        if (d.on) {
+          runtime.startEar();
+          createOverlayWindow().showInactive();
+          setCopilotState("ready");
+        } else {
+          runtime.stopEar();
+          overlayWindow?.hide();
+        }
+        updateTray();
       }
     });
     ws.on("close", () => {
@@ -340,6 +379,19 @@ function stopBridge() {
     /* déjà fermé */
   }
   bridgeWs = null;
+}
+// Envoie une trame au serveur runtime via le pont (ex. la croix de l'overlay :
+// reset_session pour le bilan + audio_toggle off). No-op si le pont est fermé.
+function bridgeSend(obj) {
+  try {
+    if (bridgeWs && bridgeWs.readyState === WebSocket.OPEN) {
+      bridgeWs.send(JSON.stringify(obj));
+      return true;
+    }
+  } catch {
+    /* pont fermé */
+  }
+  return false;
 }
 
 // Instance UNIQUE : indispensable pour le deep-link. Quand le navigateur ouvre
@@ -379,6 +431,17 @@ if (!gotLock) {
     runtime.setLogHandler((line) => console.log(line));
     globalShortcut.register("CommandOrControl+Shift+G", toggleCopilot);
     ipcMain.on("overlay:hide", () => overlayWindow?.hide());
+    // Croix de l'overlay = FIN D'APPEL, accessible même hors du SaaS : on enregistre
+    // le bilan (reset_session → le serveur analyse l'appel + sauve le débrief, visible
+    // sur getyes.app) PUIS on coupe l'écoute et on referme l'overlay. audio_toggle off
+    // fait aussi repasser le cockpit en « DÉMARRER » (état synchronisé via l'écho).
+    ipcMain.on("overlay:endCall", () => {
+      bridgeSend({ type: "reset_session" });
+      bridgeSend({ type: "audio_toggle", on: false });
+      runtime.stopEar(); // filet direct (idempotent) si le pont hoquette
+      overlayWindow?.hide();
+      updateTray();
+    });
     ipcMain.handle("copilot:start", () => startCopilot());
     ipcMain.handle("copilot:stop", () => stopCopilot());
     ipcMain.handle("copilot:toggle", () => toggleCopilot());
@@ -389,6 +452,9 @@ if (!gotLock) {
     // du cockpit n'est pas cliqué).
     ipcMain.handle("launcher:show", (_e, bounds) => {
       runtime.start({ brainOnly: true });
+      // Le pont observe LE bouton (audio_toggle) → oreille + overlay. Démarré une
+      // fois : re-naviguer vers Copilote ne le relance pas (garde sur "off").
+      if (copilotState === "off") startBridge();
       return launcherView.show(bounds);
     });
     ipcMain.on("launcher:bounds", (_e, bounds) => launcherView.setBounds(bounds));
