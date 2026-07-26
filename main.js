@@ -16,6 +16,7 @@ const {
   net,
   Notification,
   dialog,
+  Tray,
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -32,6 +33,7 @@ const UA_MARKER = "GetYesDesktop/0.1";
 
 let mainWindow;
 let overlayWindow;
+let tray;
 
 // Retour OAuth : getyes://auth-callback?code=... → on recharge /auth/callback
 // DANS la fenêtre (là où vit le code_verifier PKCE posé au clic « Google »),
@@ -224,30 +226,63 @@ async function startCopilot() {
   }
   const res = runtime.start({ closerId });
   createOverlayWindow().showInactive();
-  // En réel : le launcher d'Eliott prend la fenêtre principale (choix Martin :
-  // « dans la fenêtre principale »). En mock, on reste sur le SaaS.
-  if (!isMock) {
-    const launcher = path.join(
-      cfg.runtimeDir,
-      "closepilot_ui",
-      "src",
-      "launcher.html",
-    );
-    if (mainWindow && fs.existsSync(launcher)) mainWindow.loadFile(launcher);
-  }
+  updateTray(); // l'icône barre des tâches propose « Arrêter le copilote »
   return res;
 }
 function stopCopilot() {
   runtime.stop();
   overlayWindow?.hide();
-  // Retour à l'app (SaaS) si la fenêtre principale est sur le launcher (file://).
-  if (mainWindow && mainWindow.webContents.getURL().startsWith("file://")) {
-    mainWindow.loadURL(SAAS_URL);
-  }
+  updateTray();
 }
 function toggleCopilot() {
   if (runtime.isRunning() && overlayWindow?.isVisible()) stopCopilot();
   else startCopilot();
+}
+
+// ─── Icône barre des tâches — arrêt du copilote TOUJOURS accessible ──────────
+function updateTray() {
+  if (!tray) return;
+  const running = runtime.isRunning();
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: "Ouvrir GetYes",
+        click: () => {
+          if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        },
+      },
+      { type: "separator" },
+      {
+        label: running ? "⏹  Arrêter le copilote" : "Copilote arrêté",
+        enabled: running,
+        click: () => stopCopilot(),
+      },
+      { type: "separator" },
+      {
+        label: "Quitter GetYes",
+        click: () => {
+          stopCopilot();
+          app.quit();
+        },
+      },
+    ]),
+  );
+  tray.setToolTip(running ? "GetYes — copilote actif (à l'écoute)" : "GetYes");
+}
+
+function createTray() {
+  if (tray) return;
+  tray = new Tray(path.join(__dirname, "assets", "app-icon-v3.ico"));
+  tray.on("click", () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+  updateTray();
 }
 
 // Instance UNIQUE : indispensable pour le deep-link. Quand le navigateur ouvre
@@ -276,7 +311,9 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     app.setAppUserModelId("com.getyes.app"); // icône barre des tâches
+    runtime.sweepKill(); // tue tout runtime orphelin d'une session précédente
     Menu.setApplicationMenu(null);
+    createTray();
     createWindow();
 
     // Runtime : logs en console + raccourci global de bascule du copilote +
@@ -287,6 +324,7 @@ if (!gotLock) {
     ipcMain.handle("copilot:start", () => startCopilot());
     ipcMain.handle("copilot:stop", () => stopCopilot());
     ipcMain.handle("copilot:toggle", () => toggleCopilot());
+    ipcMain.handle("copilot:isRunning", () => runtime.isRunning());
 
     // Mises à jour automatiques (app packagée uniquement) : vérifie le flux de
     // versions, télécharge en arrière-plan, installe au prochain redémarrage —

@@ -20,5 +20,6 @@ contextBridge.exposeInMainWorld("getyesDesktop", {
     start: () => ipcRenderer.invoke("copilot:start"),
     stop: () => ipcRenderer.invoke("copilot:stop"),
     toggle: () => ipcRenderer.invoke("copilot:toggle"),
+    isRunning: () => ipcRenderer.invoke("copilot:isRunning"),
   },
 });

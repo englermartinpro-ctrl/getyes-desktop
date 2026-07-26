@@ -11,10 +11,49 @@
 //   GETYES_EAR          = loopback | mic        (défaut : loopback = appel réel)
 // -----------------------------------------------------------------------------
 
-const { spawn } = require("child_process");
+const { spawn, execFileSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+
+// Tue un PID ET tout son arbre de sous-process (le cerveau peut spawn des
+// enfants). Sous Windows, p.kill() ne tue QUE le process direct → taskkill /T.
+function killTree(pid) {
+  if (!pid) return;
+  if (process.platform === "win32") {
+    try {
+      execFileSync("taskkill", ["/pid", String(pid), "/T", "/F"], {
+        stdio: "ignore",
+        timeout: 5000,
+      });
+    } catch {
+      /* déjà mort */
+    }
+  } else {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      /* déjà mort */
+    }
+  }
+}
+
+// FILET DE SÉCURITÉ ABSOLU : tue TOUT process runtime encore vivant, identifié
+// par sa ligne de commande — même orphelin d'un crash ou d'un force-close.
+// Garantit que l'oreille ne peut JAMAIS continuer à écouter sans l'app.
+function sweepKill() {
+  if (process.platform !== "win32") return;
+  const ps =
+    'Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "python.exe" -and ($_.CommandLine -match "closepilot_ui_server|_ecoute_on|_test_micro_on|closepilot_live") } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }';
+  try {
+    execFileSync("powershell", ["-NoProfile", "-Command", ps], {
+      stdio: "ignore",
+      timeout: 6000,
+    });
+  } catch {
+    /* rien à tuer */
+  }
+}
 
 // Env du brain — aligné sur la spec d'Eliott (réponse du 26/07). Les CLÉS API
 // ne sont JAMAIS ici : elles vivent dans le supabase/.env du runtime.
@@ -132,6 +171,7 @@ function start(opts = {}) {
 
 function stop() {
   for (const p of procs) {
+    killTree(p.pid); // tue le process ET tout son arbre
     try {
       p.kill();
     } catch {
@@ -139,6 +179,7 @@ function stop() {
     }
   }
   procs = [];
+  sweepKill(); // filet : aucun orphelin ne survit
 }
 
 const isRunning = () => procs.length > 0;
@@ -146,4 +187,4 @@ const setLogHandler = (fn) => {
   onLog = typeof fn === "function" ? fn : () => {};
 };
 
-module.exports = { start, stop, isRunning, setLogHandler, config };
+module.exports = { start, stop, isRunning, setLogHandler, config, sweepKill };

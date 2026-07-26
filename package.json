@@ -1,6 +1,6 @@
 {
   "name": "getyes-desktop",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "GetYes — application de bureau (Electron : SaaS embarqué + runtime local à venir)",
   "main": "main.js",
@@ -29,7 +29,8 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "GetYes"
+      "shortcutName": "GetYes",
+      "include": "build/installer.nsh"
     },
     "protocols": [
       {
