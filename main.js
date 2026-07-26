@@ -74,13 +74,28 @@ function createWindow() {
     minHeight: 680,
     title: "GetYes",
     icon: path.join(__dirname, "assets", "app-icon-v3.ico"),
-    backgroundColor: "#000000", // évite le flash blanc au chargement
+    backgroundColor: "#000000", // fond noir sous le rendu web (2e filet)
+    show: false, // ← ANTI-FLASH : on n'affiche qu'au 1er rendu prêt (ci-dessous)
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  // Flash blanc au lancement (Windows) : la fenêtre NATIVE s'affiche blanche ~1
+  // frame avant que le moteur web ne peigne — backgroundColor seul ne le masque
+  // pas. On garde la fenêtre CACHÉE jusqu'à "ready-to-show" : à ce moment le 1er
+  // rendu du SaaS est déjà peint (voile noir gy-splash-pending → splash vidéo),
+  // donc on révèle du NOIR, jamais du blanc. Filet : on affiche quand même après
+  // 10 s si le rendu tarde (réseau) — ne jamais laisser l'app invisible.
+  const showFallback = setTimeout(() => {
+    if (mainWindow && !mainWindow.isVisible()) mainWindow.show();
+  }, 10000);
+  mainWindow.once("ready-to-show", () => {
+    clearTimeout(showFallback);
+    mainWindow.show();
   });
 
   // UA marqueur AVANT le premier load (le SaaS le lit dès /login).
