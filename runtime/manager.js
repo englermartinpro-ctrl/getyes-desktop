@@ -14,6 +14,7 @@
 const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 
 // Env du brain — aligné sur la spec d'Eliott (réponse du 26/07). Les CLÉS API
 // ne sont JAMAIS ici : elles vivent dans le supabase/.env du runtime.
@@ -23,9 +24,18 @@ const BRAIN_ENV = {
 };
 
 function config() {
+  // Dossier du runtime : env, sinon ~/getyes-runtime (le vrai chez Martin ; le
+  // packaging le fixera pour la distribution). Aucun chemin en dur avec un nom.
+  const runtimeDir =
+    process.env.GETYES_RUNTIME_DIR || path.join(os.homedir(), "getyes-runtime");
+  // Mode : env, sinon AUTO — real si le runtime est présent sur la machine,
+  // mock sinon (dev sans runtime).
+  const present = fs.existsSync(
+    path.join(runtimeDir, "closepilot_ui_server.py"),
+  );
   return {
-    mode: process.env.GETYES_RUNTIME_MODE || "mock",
-    runtimeDir: process.env.GETYES_RUNTIME_DIR || "",
+    mode: process.env.GETYES_RUNTIME_MODE || (present ? "real" : "mock"),
+    runtimeDir,
     // Oreille : loopback (voix du prospect, appel réel) ou micro (test solo closer).
     earScript:
       process.env.GETYES_EAR === "mic" ? "_test_micro_on.py" : "_ecoute_on.py",

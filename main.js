@@ -17,6 +17,7 @@ const {
   Notification,
 } = require("electron");
 const path = require("path");
+const fs = require("fs");
 const runtime = require("./runtime/manager");
 
 // L'app ouvre LE PRODUIT (SaaS après connexion), PAS la landing. /dashboard →
@@ -140,12 +141,22 @@ function createOverlayWindow() {
   });
   overlayWindow.setAlwaysOnTop(true, "screen-saver"); // au-dessus du plein écran
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  // En mode mock : ?dev=1 → l'overlay affiche le champ « simuler le prospect ».
-  const isMock = (process.env.GETYES_RUNTIME_MODE || "mock") === "mock";
-  overlayWindow.loadFile(
-    path.join(__dirname, "overlay", "index.html"),
-    isMock ? { search: "dev=1" } : {},
+  const cfg = runtime.config();
+  const eliottOverlay = path.join(
+    cfg.runtimeDir,
+    "closepilot_ui",
+    "src",
+    "index.html",
   );
+  if (cfg.mode === "real" && fs.existsSync(eliottOverlay)) {
+    // Overlay d'Eliott (choix de Martin), bundlé avec le runtime.
+    overlayWindow.loadFile(eliottOverlay);
+  } else {
+    // Mode mock (dev) : mon overlay + champ de test « simuler le prospect ».
+    overlayWindow.loadFile(path.join(__dirname, "overlay", "index.html"), {
+      search: "dev=1",
+    });
+  }
   overlayWindow.on("closed", () => (overlayWindow = null));
   return overlayWindow;
 }
@@ -177,7 +188,8 @@ function notifier(titre, corps) {
 // Lance le runtime (mock|real) + affiche l'overlay SANS voler le focus de l'appel,
 // APRÈS le gate Auth/abonnement.
 async function startCopilot() {
-  const isMock = (process.env.GETYES_RUNTIME_MODE || "mock") === "mock";
+  const cfg = runtime.config();
+  const isMock = cfg.mode === "mock";
   // Gate Auth/abonnement : appliqué en mode RÉEL uniquement (le runtime brûle des
   // ressources IA payantes). En mock (dev), rien n'est consommé → pas de gate,
   // pour pouvoir tester l'overlay sans être connecté dans la fenêtre.
@@ -206,11 +218,26 @@ async function startCopilot() {
   }
   const res = runtime.start({ closerId });
   createOverlayWindow().showInactive();
+  // En réel : le launcher d'Eliott prend la fenêtre principale (choix Martin :
+  // « dans la fenêtre principale »). En mock, on reste sur le SaaS.
+  if (!isMock) {
+    const launcher = path.join(
+      cfg.runtimeDir,
+      "closepilot_ui",
+      "src",
+      "launcher.html",
+    );
+    if (mainWindow && fs.existsSync(launcher)) mainWindow.loadFile(launcher);
+  }
   return res;
 }
 function stopCopilot() {
   runtime.stop();
   overlayWindow?.hide();
+  // Retour à l'app (SaaS) si la fenêtre principale est sur le launcher (file://).
+  if (mainWindow && mainWindow.webContents.getURL().startsWith("file://")) {
+    mainWindow.loadURL(SAAS_URL);
+  }
 }
 function toggleCopilot() {
   if (runtime.isRunning() && overlayWindow?.isVisible()) stopCopilot();
