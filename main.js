@@ -250,6 +250,30 @@ function notifier(titre, corps) {
   }
 }
 
+// Met en forme les notes de version pour le dialogue de MAJ. GitHub renvoie soit
+// une string (corps de la release, souvent en HTML), soit un tableau
+// {version, note}. On nettoie le HTML et on borne (dialogue lisible : 8 lignes /
+// 500 caractères max). Vide si aucune note → le dialogue n'affiche que le numéro.
+function formatReleaseNotes(raw) {
+  if (!raw) return "";
+  let text = Array.isArray(raw)
+    ? raw.map((r) => (typeof r === "string" ? r : r?.note || "")).join("\n")
+    : String(raw);
+  text = text
+    .replace(/<[^>]+>/g, "") // retire les balises HTML
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\r/g, "")
+    .trim();
+  const lignes = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+  text = lignes.join("\n");
+  return text.length > 500 ? `${text.slice(0, 500)}…` : text;
+}
+
 // Lance le runtime (mock|real) + affiche l'overlay SANS voler le focus de l'appel,
 // APRÈS le gate Auth/abonnement.
 async function startCopilot() {
@@ -492,17 +516,21 @@ if (!gotLock) {
     // zéro réinstallation (comme Claude). Le flux est défini dans package.json
     // (champ "publish"). En dev, pas de flux → on ne l'appelle pas.
     if (app.isPackaged) {
-      autoUpdater.on("update-downloaded", async () => {
+      autoUpdater.on("update-downloaded", async (info) => {
         // Comme Claude : l'app tourne encore sur l'ancienne version → on propose
         // de la RELANCER pour appliquer la MAJ (sinon : au prochain démarrage).
+        // On affiche le NUMÉRO de version + les NOTES (corps de la release GitHub).
+        const version = info?.version ? `Version ${info.version}` : "Nouvelle version";
+        const notes = formatReleaseNotes(info?.releaseNotes);
         const { response } = await dialog.showMessageBox({
           type: "info",
           buttons: ["Relancer maintenant", "Plus tard"],
           defaultId: 0,
           cancelId: 1,
           title: "GetYes — mise à jour prête",
-          message: "Une nouvelle version de GetYes est prête.",
+          message: `${version} est prête à être installée.`,
           detail:
+            (notes ? `Nouveautés :\n${notes}\n\n` : "") +
             "Relance l'app pour l'appliquer (quelques secondes). Sinon, elle s'installera au prochain démarrage.",
         });
         if (response === 0) autoUpdater.quitAndInstall();
