@@ -15,7 +15,6 @@ const {
   ipcMain,
   net,
   Notification,
-  dialog,
   Tray,
 } = require("electron");
 const path = require("path");
@@ -35,6 +34,7 @@ const UA_MARKER = "GetYesDesktop/0.1";
 
 let mainWindow;
 let overlayWindow;
+let updateWindow = null;
 let tray;
 let copilotState = "off"; // off | starting | ready — relu par le SaaS
 let bridgeWs = null;
@@ -274,6 +274,81 @@ function formatReleaseNotes(raw) {
   return text.length > 500 ? `${text.slice(0, 500)}…` : text;
 }
 
+// Notes de la version la plus récente du CHANGELOG.md (1er bloc « ## x.y.z »).
+// Sert de repli si la release GitHub n'a pas de corps, ET à prévisualiser le
+// pop-up en dev (raccourci Ctrl+Shift+U) sans rien publier.
+function readLatestChangelog() {
+  try {
+    const md = fs.readFileSync(path.join(__dirname, "CHANGELOG.md"), "utf8");
+    const m = md.match(/^##\s+.+?\n([\s\S]*?)(?=\n##\s|$)/m);
+    return m ? m[1].trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+// Pop-up de MAJ maison (remplace le dialogue natif, qui ne sait pas déplier) :
+// par défaut « Version X.Y.Z prête » + Relancer / Plus tard ; les nouveautés se
+// révèlent au clic sur « Nouveautés » (souligné). Se redimensionne au contenu.
+function createUpdateWindow(info) {
+  if (updateWindow && !updateWindow.isDestroyed()) {
+    updateWindow.focus();
+    return updateWindow;
+  }
+  updateWindow = new BrowserWindow({
+    width: 420,
+    height: 190,
+    useContentSize: true,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    frame: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    backgroundColor: "#101012",
+    show: false,
+    parent: mainWindow || undefined,
+    webPreferences: {
+      preload: path.join(__dirname, "update", "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  updateWindow.loadFile(path.join(__dirname, "update", "dialog.html"));
+  updateWindow.once("ready-to-show", () => {
+    updateWindow.center();
+    updateWindow.show();
+  });
+  updateWindow.webContents.once("did-finish-load", () => {
+    // Notes = corps de la release GitHub, sinon repli sur le CHANGELOG embarqué.
+    const notes =
+      formatReleaseNotes(info?.releaseNotes) || readLatestChangelog();
+    updateWindow.webContents.send("update:info", {
+      version: info?.version || app.getVersion(),
+      notes,
+    });
+  });
+
+  const onRelaunch = () => autoUpdater.quitAndInstall();
+  const onLater = () => updateWindow && !updateWindow.isDestroyed() && updateWindow.close();
+  const onResize = (_e, h) => {
+    if (updateWindow && !updateWindow.isDestroyed()) {
+      updateWindow.setContentSize(420, Math.max(120, Math.min(560, Math.round(h || 190))));
+    }
+  };
+  ipcMain.on("update:relaunch", onRelaunch);
+  ipcMain.on("update:later", onLater);
+  ipcMain.on("update:resize", onResize);
+  updateWindow.on("closed", () => {
+    ipcMain.removeListener("update:relaunch", onRelaunch);
+    ipcMain.removeListener("update:later", onLater);
+    ipcMain.removeListener("update:resize", onResize);
+    updateWindow = null;
+  });
+  return updateWindow;
+}
+
 // Lance le runtime (mock|real) + affiche l'overlay SANS voler le focus de l'appel,
 // APRÈS le gate Auth/abonnement.
 async function startCopilot() {
@@ -481,6 +556,13 @@ if (!gotLock) {
     // IPC (bouton masquer overlay, et start/stop pilotables plus tard par le SaaS).
     runtime.setLogHandler((line) => console.log(line));
     globalShortcut.register("CommandOrControl+Shift+G", toggleCopilot);
+    // Dev seulement : prévisualiser le pop-up de MAJ (avec le vrai CHANGELOG)
+    // sans rien publier — pour valider le rendu avant une release.
+    if (!app.isPackaged) {
+      globalShortcut.register("CommandOrControl+Shift+U", () =>
+        createUpdateWindow({ version: app.getVersion() }),
+      );
+    }
     ipcMain.on("overlay:hide", () => overlayWindow?.hide());
     // Croix de l'overlay = FIN D'APPEL, accessible même hors du SaaS : on enregistre
     // le bilan (reset_session → le serveur analyse l'appel + sauve le débrief, visible
@@ -516,24 +598,11 @@ if (!gotLock) {
     // zéro réinstallation (comme Claude). Le flux est défini dans package.json
     // (champ "publish"). En dev, pas de flux → on ne l'appelle pas.
     if (app.isPackaged) {
-      autoUpdater.on("update-downloaded", async (info) => {
-        // Comme Claude : l'app tourne encore sur l'ancienne version → on propose
-        // de la RELANCER pour appliquer la MAJ (sinon : au prochain démarrage).
-        // On affiche le NUMÉRO de version + les NOTES (corps de la release GitHub).
-        const version = info?.version ? `Version ${info.version}` : "Nouvelle version";
-        const notes = formatReleaseNotes(info?.releaseNotes);
-        const { response } = await dialog.showMessageBox({
-          type: "info",
-          buttons: ["Relancer maintenant", "Plus tard"],
-          defaultId: 0,
-          cancelId: 1,
-          title: "GetYes — mise à jour prête",
-          message: `${version} est prête à être installée.`,
-          detail:
-            (notes ? `Nouveautés :\n${notes}\n\n` : "") +
-            "Relance l'app pour l'appliquer (quelques secondes). Sinon, elle s'installera au prochain démarrage.",
-        });
-        if (response === 0) autoUpdater.quitAndInstall();
+      autoUpdater.on("update-downloaded", (info) => {
+        // Comme Claude : l'app tourne encore sur l'ancienne version → pop-up maison
+        // dépliable (Relancer / Plus tard, « Nouveautés » au clic). Sinon la MAJ
+        // s'installe au prochain démarrage.
+        createUpdateWindow(info);
       });
       autoUpdater.on("error", (e) => console.log("[updater]", e?.message));
       autoUpdater.checkForUpdates();

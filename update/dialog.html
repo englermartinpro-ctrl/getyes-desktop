@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: #101012; color: #E3E4E6;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased; user-select: none; overflow: hidden;
+  }
+  .wrap { padding: 18px 20px 16px; }
+  .title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .version { margin-top: 5px; font-size: 12.5px; color: #8A8F98; line-height: 1.45; }
+  /* « Nouveautés » — lien souligné discret : la plupart l'ignorent. */
+  .toggle {
+    margin-top: 12px; display: inline-flex; align-items: center; gap: 5px;
+    background: none; border: none; padding: 0; color: #C7C9CE; font: inherit;
+    font-size: 12.5px; text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+  }
+  .toggle:hover { color: #E3E4E6; }
+  .toggle .caret { font-size: 9px; transition: transform 0.18s ease; }
+  .toggle.open .caret { transform: rotate(180deg); }
+  .notes { margin-top: 11px; padding-top: 12px; border-top: 1px solid #26262B; }
+  .notes ul { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  .notes li {
+    position: relative; padding-left: 14px; font-size: 12.5px; line-height: 1.5; color: #B3B7BE;
+  }
+  .notes li::before {
+    content: ""; position: absolute; left: 2px; top: 8px;
+    width: 4px; height: 4px; border-radius: 50%; background: #5A5F68;
+  }
+  .actions { margin-top: 18px; display: flex; justify-content: flex-end; gap: 8px; }
+  .btn {
+    border: 1px solid transparent; border-radius: 8px; padding: 8px 14px;
+    font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .btn.ghost { background: transparent; border-color: #26262B; color: #C7C9CE; }
+  .btn.ghost:hover { border-color: #3a3a42; color: #E3E4E6; }
+  .btn.primary { background: #E3E4E6; color: #101012; }
+  .btn.primary:hover { background: #ffffff; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <div class="wrap" id="wrap">
+    <p class="title">Mise à jour prête</p>
+    <p class="version" id="version">Une nouvelle version est prête.</p>
+    <button class="toggle" id="toggle" type="button" hidden>
+      Nouveautés <span class="caret" aria-hidden="true">▾</span>
+    </button>
+    <div class="notes" id="notes" hidden></div>
+    <div class="actions">
+      <button class="btn ghost" id="later" type="button">Plus tard</button>
+      <button class="btn primary" id="relaunch" type="button">Relancer maintenant</button>
+    </div>
+  </div>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    function resize() {
+      window.updateAPI.resize(Math.ceil($("wrap").getBoundingClientRect().height));
+    }
+    window.updateAPI.onInfo(({ version, notes }) => {
+      $("version").textContent = version
+        ? "Version " + version + " est prête à être installée."
+        : "Une nouvelle version est prête.";
+      const lines = (notes || "")
+        .split("\n")
+        .map((s) => s.replace(/^[-•]\s*/, "").trim())
+        .filter(Boolean);
+      if (lines.length) {
+        const ul = document.createElement("ul");
+        for (const line of lines) {
+          const li = document.createElement("li");
+          li.textContent = line; // textContent : jamais d'injection
+          ul.appendChild(li);
+        }
+        $("notes").appendChild(ul);
+        $("toggle").hidden = false;
+      }
+      resize();
+    });
+    $("toggle").addEventListener("click", () => {
+      const willOpen = $("notes").hidden;
+      $("notes").hidden = !willOpen;
+      $("toggle").classList.toggle("open", willOpen);
+      resize();
+    });
+    $("relaunch").addEventListener("click", () => window.updateAPI.relaunch());
+    $("later").addEventListener("click", () => window.updateAPI.later());
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") window.updateAPI.later();
+    });
+  </script>
+</body>
+</html>
