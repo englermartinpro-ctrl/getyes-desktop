@@ -37,6 +37,18 @@ function show(bounds) {
       webPreferences: { contextIsolation: true, nodeIntegration: false },
     });
     view.webContents.loadFile(launcherFile);
+    // Restyle DANS la vue (sans modifier le fichier d'Eliott) : on masque la
+    // colonne identité (logo / abonnement / conseil / nouveau — redondante avec
+    // le SaaS) et on centre la colonne ACTION en plein écran.
+    view.webContents.on("did-finish-load", () => {
+      view.webContents
+        .insertCSS(
+          ".hero{display:none!important}" +
+            ".launcher{justify-content:center!important}" +
+            ".action{flex:0 1 780px!important;max-width:100%!important}",
+        )
+        .catch(() => {});
+    });
     // Liens getyes.app (stats / compte / débrief) → navigateur système.
     view.webContents.setWindowOpenHandler(({ url }) => {
       shell.openExternal(url);
