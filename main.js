@@ -181,6 +181,7 @@ async function startCopilot() {
   // Gate Auth/abonnement : appliqué en mode RÉEL uniquement (le runtime brûle des
   // ressources IA payantes). En mock (dev), rien n'est consommé → pas de gate,
   // pour pouvoir tester l'overlay sans être connecté dans la fenêtre.
+  let closerId;
   if (!isMock) {
     const ent = await checkEntitlement();
     if (ent === null) {
@@ -201,8 +202,9 @@ async function startCopilot() {
       }
       return { ok: false, reason: "entitlement" };
     }
+    closerId = ent.closerId; // posé dans getyes_settings.json → fiche de vente
   }
-  const res = runtime.start();
+  const res = runtime.start({ closerId });
   createOverlayWindow().showInactive();
   return res;
 }
