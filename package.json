@@ -20,14 +20,6 @@
         "repo": "getyes-desktop"
       }
     ],
-    "files": [
-      "main.js",
-      "preload.js",
-      "runtime/**/*",
-      "overlay/**/*",
-      "dev/**/*",
-      "assets/**/*"
-    ],
     "win": {
       "target": "nsis",
       "icon": "assets/app-icon-v3.ico"
