@@ -23,6 +23,7 @@ const fs = require("fs");
 const runtime = require("./runtime/manager");
 const { autoUpdater } = require("electron-updater");
 const WebSocket = require("ws");
+const launcherView = require("./launcher-view");
 
 // L'app ouvre LE PRODUIT (SaaS après connexion), PAS la landing. /dashboard →
 // app si connecté, sinon /login. En dev : GETYES_URL=http://localhost:3000/dashboard
@@ -371,6 +372,7 @@ if (!gotLock) {
     Menu.setApplicationMenu(null);
     createTray();
     createWindow();
+    launcherView.init(mainWindow, runtime.config().runtimeDir);
 
     // Runtime : logs en console + raccourci global de bascule du copilote +
     // IPC (bouton masquer overlay, et start/stop pilotables plus tard par le SaaS).
@@ -382,6 +384,15 @@ if (!gotLock) {
     ipcMain.handle("copilot:toggle", () => toggleCopilot());
     ipcMain.handle("copilot:isRunning", () => runtime.isRunning());
     ipcMain.handle("copilot:state", () => copilotState);
+    // Cockpit d'Eliott intégré dans la page : le SaaS indique la région, on y
+    // pose la vue + on démarre le CERVEAU SEUL (zéro écoute tant que LE bouton
+    // du cockpit n'est pas cliqué).
+    ipcMain.handle("launcher:show", (_e, bounds) => {
+      runtime.start({ brainOnly: true });
+      return launcherView.show(bounds);
+    });
+    ipcMain.on("launcher:bounds", (_e, bounds) => launcherView.setBounds(bounds));
+    ipcMain.on("launcher:hide", () => launcherView.hide());
 
     // Mises à jour automatiques (app packagée uniquement) : vérifie le flux de
     // versions, télécharge en arrière-plan, installe au prochain redémarrage —

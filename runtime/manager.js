@@ -150,7 +150,7 @@ function start(opts = {}) {
   if (opts.closerId) writeCloserSettings(cfg.runtimeDir, opts.closerId);
 
   const env = { ...process.env, ...BRAIN_ENV };
-  // 1) Cerveau + hub WebSocket (ws://127.0.0.1:8765).
+  // 1) Cerveau + hub WebSocket (ws://127.0.0.1:8765). AUCUN audio ici.
   const brain = spawn(py, ["-u", "closepilot_ui_server.py"], {
     cwd: cfg.runtimeDir,
     env,
@@ -158,15 +158,27 @@ function start(opts = {}) {
   });
   pipe(brain, "cerveau");
   procs.push(brain);
-  // 2) Oreille : loopback (voix prospect) ou micro (test solo).
-  const ear = spawn(py, ["-u", cfg.earScript], {
+  // 2) Oreille : SEULEMENT si on veut écouter tout de suite. En brainOnly (ouverture
+  //    du cockpit), on NE démarre PAS l'oreille → zéro écoute tant que LE bouton
+  //    n'est pas cliqué (startEar appelé à ce moment-là).
+  if (!opts.brainOnly) startEar();
+  return { ok: true, mode: "real", python: py };
+}
+
+// Démarre l'OREILLE (l'écoute) — séparément du cerveau, pour ne capter l'audio
+// qu'au moment où l'utilisateur active l'outil (LE bouton du cockpit).
+function startEar() {
+  const cfg = config();
+  if (cfg.mode !== "real" || !cfg.runtimeDir) return;
+  if (procs.some((p) => p._gyEar)) return; // déjà en route
+  const ear = spawn(pythonFor(cfg.runtimeDir), ["-u", cfg.earScript], {
     cwd: cfg.runtimeDir,
-    env,
+    env: { ...process.env, ...BRAIN_ENV },
     windowsHide: true,
   });
+  ear._gyEar = true;
   pipe(ear, "oreille");
   procs.push(ear);
-  return { ok: true, mode: "real", python: py, ear: cfg.earScript };
 }
 
 function stop() {
@@ -187,4 +199,12 @@ const setLogHandler = (fn) => {
   onLog = typeof fn === "function" ? fn : () => {};
 };
 
-module.exports = { start, stop, isRunning, setLogHandler, config, sweepKill };
+module.exports = {
+  start,
+  stop,
+  startEar,
+  isRunning,
+  setLogHandler,
+  config,
+  sweepKill,
+};
