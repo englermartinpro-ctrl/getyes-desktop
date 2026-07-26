@@ -125,6 +125,13 @@ function createWindow() {
   });
 }
 
+// Rend l'overlay déplaçable en réutilisant les zones data-tauri-drag-region
+// d'Eliott ; tout ce qui est interactif (boutons, champ, statut, croix) reste
+// cliquable (no-drag) et non happé par le glisser-déposer de la fenêtre.
+const OVERLAY_DRAG_CSS =
+  "[data-tauri-drag-region]{-webkit-app-region:drag}" +
+  "button,input,select,textarea,a,#gyEndCall,.status,#listenBtn,.footer-right{-webkit-app-region:no-drag}";
+
 // Croix « terminer l'appel » posée dans le coin de l'overlay. Rouge au survol
 // (action franche). Appelle overlayAPI.endCall (preload) → reset_session + stop.
 const OVERLAY_CROSS_JS = `(function(){
@@ -152,11 +159,13 @@ function createOverlayWindow() {
   overlayWindow = new BrowserWindow({
     width: 560,
     height: 190,
+    minWidth: 320,
+    minHeight: 110,
     x: Math.round((width - 560) / 2),
     y: 24,
     frame: false,
     transparent: true,
-    resizable: false,
+    resizable: true, // taille ajustable (bords) — comme l'overlay Tauri d'Eliott
     skipTaskbar: true,
     alwaysOnTop: true,
     fullscreenable: false,
@@ -170,6 +179,9 @@ function createOverlayWindow() {
   });
   overlayWindow.setAlwaysOnTop(true, "screen-saver"); // au-dessus du plein écran
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // INDÉTECTABLE en partage d'écran / capture (WDA_EXCLUDEFROMCAPTURE côté Windows) :
+  // le prospect ne voit jamais l'overlay en visio. Feature clé qu'Eliott avait posée.
+  overlayWindow.setContentProtection(true);
   const cfg = runtime.config();
   const eliottOverlay = path.join(
     cfg.runtimeDir,
@@ -186,11 +198,14 @@ function createOverlayWindow() {
       search: "dev=1",
     });
   }
-  // Croix « fin d'appel » injectée par-dessus l'overlay (sans modifier les fichiers
-  // d'Eliott — même principe que le cockpit). Toujours visible, même hors du SaaS :
-  // c'est le seul arrêt garanti pendant un appel. Idempotent (ne se rajoute pas).
+  // Restyle injecté par-dessus l'overlay (sans modifier les fichiers d'Eliott —
+  // même principe que le cockpit) : (1) déplaçable partout, en réutilisant SES zones
+  // data-tauri-drag-region ; (2) la croix « fin d'appel ». Idempotent.
   overlayWindow.webContents.on("did-finish-load", () => {
-    overlayWindow?.webContents.executeJavaScript(OVERLAY_CROSS_JS).catch(() => {});
+    const wc = overlayWindow?.webContents;
+    if (!wc) return;
+    wc.insertCSS(OVERLAY_DRAG_CSS).catch(() => {});
+    wc.executeJavaScript(OVERLAY_CROSS_JS).catch(() => {});
   });
   overlayWindow.on("closed", () => (overlayWindow = null));
   return overlayWindow;
@@ -344,19 +359,16 @@ function startBridge() {
         return; // trame non-JSON ignorée
       }
       if (d.type === "ready") setCopilotState("ready");
-      // LE bouton du cockpit (ou l'overlay) bascule l'écoute → le serveur diffuse
-      // audio_toggle à tous les clients. C'est NOTRE process qui possède l'oreille
-      // (Python) et l'overlay : on les démarre/arrête ici. Zéro écoute tant que ce
-      // signal n'arrive pas — le cockpit ne fait tourner que le cerveau.
-      if (d.type === "audio_toggle") {
-        if (d.on) {
-          runtime.startEar();
-          createOverlayWindow().showInactive();
-          setCopilotState("ready");
-        } else {
-          runtime.stopEar();
-          overlayWindow?.hide();
-        }
+      // audio_toggle est diffusé par le serveur quand on bascule l'écoute.
+      //  • ON  → on DÉMARRE l'oreille (1re fois) + on affiche l'overlay. Zéro
+      //          écoute tant que ce signal n'arrive pas (le cockpit = cerveau seul).
+      //  • OFF → PAUSE DOUCE : le pont audio d'Eliott se met en pause tout seul et
+      //          GARDE LE FIL (session intacte). On NE tue PAS l'oreille ici — c'est
+      //          la CROIX de l'overlay (fin d'appel) qui coupe et fait le bilan.
+      if (d.type === "audio_toggle" && d.on) {
+        runtime.startEar();
+        createOverlayWindow().showInactive();
+        setCopilotState("ready");
         updateTray();
       }
     });
