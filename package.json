@@ -16,6 +16,9 @@
     "files": [
       "main.js",
       "preload.js",
+      "runtime/**/*",
+      "overlay/**/*",
+      "dev/**/*",
       "assets/**/*"
     ],
     "win": {
