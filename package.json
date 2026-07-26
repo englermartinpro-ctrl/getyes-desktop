@@ -1,6 +1,6 @@
 {
   "name": "getyes-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "GetYes — application de bureau (Electron : SaaS embarqué + runtime local à venir)",
   "main": "main.js",
@@ -13,6 +13,13 @@
   "build": {
     "appId": "com.getyes.app",
     "productName": "GetYes",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "englermartinpro-ctrl",
+        "repo": "getyes-desktop"
+      }
+    ],
     "files": [
       "main.js",
       "preload.js",
@@ -45,5 +52,8 @@
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3",
     "ws": "^8.21.1"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

@@ -15,10 +15,12 @@ const {
   ipcMain,
   net,
   Notification,
+  dialog,
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const runtime = require("./runtime/manager");
+const { autoUpdater } = require("electron-updater");
 
 // L'app ouvre LE PRODUIT (SaaS après connexion), PAS la landing. /dashboard →
 // app si connecté, sinon /login. En dev : GETYES_URL=http://localhost:3000/dashboard
@@ -285,6 +287,34 @@ if (!gotLock) {
     ipcMain.handle("copilot:start", () => startCopilot());
     ipcMain.handle("copilot:stop", () => stopCopilot());
     ipcMain.handle("copilot:toggle", () => toggleCopilot());
+
+    // Mises à jour automatiques (app packagée uniquement) : vérifie le flux de
+    // versions, télécharge en arrière-plan, installe au prochain redémarrage —
+    // zéro réinstallation (comme Claude). Le flux est défini dans package.json
+    // (champ "publish"). En dev, pas de flux → on ne l'appelle pas.
+    if (app.isPackaged) {
+      autoUpdater.on("update-downloaded", async () => {
+        // Comme Claude : l'app tourne encore sur l'ancienne version → on propose
+        // de la RELANCER pour appliquer la MAJ (sinon : au prochain démarrage).
+        const { response } = await dialog.showMessageBox({
+          type: "info",
+          buttons: ["Relancer maintenant", "Plus tard"],
+          defaultId: 0,
+          cancelId: 1,
+          title: "GetYes — mise à jour prête",
+          message: "Une nouvelle version de GetYes est prête.",
+          detail:
+            "Relance l'app pour l'appliquer (quelques secondes). Sinon, elle s'installera au prochain démarrage.",
+        });
+        if (response === 0) autoUpdater.quitAndInstall();
+      });
+      autoUpdater.on("error", (e) => console.log("[updater]", e?.message));
+      autoUpdater.checkForUpdates();
+      setInterval(
+        () => autoUpdater.checkForUpdates(),
+        6 * 60 * 60 * 1000, // re-vérif toutes les 6 h si l'app reste ouverte
+      );
+    }
 
     // Cas où l'app est lancée À FROID par un getyes:// (l'URL est dans argv).
     const initial = process.argv.find((a) => a.startsWith("getyes://"));
