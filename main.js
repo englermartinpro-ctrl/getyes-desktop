@@ -106,9 +106,13 @@ function createWindow() {
   mainWindow.webContents.on("will-navigate", detourneOAuth);
   mainWindow.webContents.on("will-redirect", detourneOAuth);
 
-  // F12 = devtools (phase de dev).
+  // F12 = devtools ; Ctrl/Cmd+R = recharger (le menu est masqué → sinon aucun
+  // raccourci de rechargement dispo).
   mainWindow.webContents.on("before-input-event", (_event, input) => {
     if (input.key === "F12") mainWindow.webContents.toggleDevTools();
+    if ((input.control || input.meta) && input.key.toLowerCase() === "r") {
+      mainWindow.webContents.reload();
+    }
   });
 }
 
