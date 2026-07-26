@@ -22,6 +22,7 @@ const path = require("path");
 const fs = require("fs");
 const runtime = require("./runtime/manager");
 const { autoUpdater } = require("electron-updater");
+const WebSocket = require("ws");
 
 // L'app ouvre LE PRODUIT (SaaS après connexion), PAS la landing. /dashboard →
 // app si connecté, sinon /login. En dev : GETYES_URL=http://localhost:3000/dashboard
@@ -34,6 +35,9 @@ const UA_MARKER = "GetYesDesktop/0.1";
 let mainWindow;
 let overlayWindow;
 let tray;
+let copilotState = "off"; // off | starting | ready — relu par le SaaS
+let bridgeWs = null;
+let bridgeTimer = null;
 
 // Retour OAuth : getyes://auth-callback?code=... → on recharge /auth/callback
 // DANS la fenêtre (là où vit le code_verifier PKCE posé au clic « Google »),
@@ -226,13 +230,14 @@ async function startCopilot() {
   }
   const res = runtime.start({ closerId });
   createOverlayWindow().showInactive();
-  updateTray(); // l'icône barre des tâches propose « Arrêter le copilote »
+  startBridge(); // suit l'état du runtime (démarrage → prêt) + met à jour la tray
   return res;
 }
 function stopCopilot() {
   runtime.stop();
   overlayWindow?.hide();
-  updateTray();
+  stopBridge();
+  setCopilotState("off"); // met aussi à jour la tray
 }
 function toggleCopilot() {
   if (runtime.isRunning() && overlayWindow?.isVisible()) stopCopilot();
@@ -242,7 +247,7 @@ function toggleCopilot() {
 // ─── Icône barre des tâches — arrêt du copilote TOUJOURS accessible ──────────
 function updateTray() {
   if (!tray) return;
-  const running = runtime.isRunning();
+  const running = copilotState !== "off";
   tray.setContextMenu(
     Menu.buildFromTemplate([
       {
@@ -270,7 +275,13 @@ function updateTray() {
       },
     ]),
   );
-  tray.setToolTip(running ? "GetYes — copilote actif (à l'écoute)" : "GetYes");
+  tray.setToolTip(
+    copilotState === "ready"
+      ? "GetYes — copilote actif (à l'écoute)"
+      : copilotState === "starting"
+        ? "GetYes — copilote en démarrage…"
+        : "GetYes",
+  );
 }
 
 function createTray() {
@@ -283,6 +294,51 @@ function createTray() {
     }
   });
   updateTray();
+}
+
+// ─── Pont SaaS ↔ runtime ─────────────────────────────────────────────────────
+// La page SaaS (origine web) ne peut pas parler au runtime (garde d'Eliott la
+// refuse). C'est donc le PROCESS PRINCIPAL qui se connecte (client Node, sans
+// en-tête Origin → autorisé) et suit l'état, que le SaaS relit par IPC.
+function setCopilotState(s) {
+  copilotState = s;
+  updateTray();
+}
+function startBridge() {
+  stopBridge();
+  setCopilotState("starting");
+  const tryConnect = () => {
+    if (copilotState === "off") return;
+    const ws = new WebSocket("ws://127.0.0.1:8765");
+    ws.on("open", () => {
+      bridgeWs = ws;
+    });
+    ws.on("message", (raw) => {
+      try {
+        if (JSON.parse(raw.toString()).type === "ready") setCopilotState("ready");
+      } catch {
+        /* trame non-JSON ignorée */
+      }
+    });
+    ws.on("close", () => {
+      bridgeWs = null;
+      if (copilotState !== "off") {
+        setCopilotState("starting");
+        bridgeTimer = setTimeout(tryConnect, 1500); // le cerveau chauffe ~20 s
+      }
+    });
+    ws.on("error", () => ws.close());
+  };
+  tryConnect();
+}
+function stopBridge() {
+  clearTimeout(bridgeTimer);
+  try {
+    bridgeWs?.close();
+  } catch {
+    /* déjà fermé */
+  }
+  bridgeWs = null;
 }
 
 // Instance UNIQUE : indispensable pour le deep-link. Quand le navigateur ouvre
@@ -325,6 +381,7 @@ if (!gotLock) {
     ipcMain.handle("copilot:stop", () => stopCopilot());
     ipcMain.handle("copilot:toggle", () => toggleCopilot());
     ipcMain.handle("copilot:isRunning", () => runtime.isRunning());
+    ipcMain.handle("copilot:state", () => copilotState);
 
     // Mises à jour automatiques (app packagée uniquement) : vérifie le flux de
     // versions, télécharge en arrière-plan, installe au prochain redémarrage —

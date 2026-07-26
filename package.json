@@ -1,6 +1,6 @@
 {
   "name": "getyes-desktop",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "GetYes — application de bureau (Electron : SaaS embarqué + runtime local à venir)",
   "main": "main.js",
@@ -43,10 +43,10 @@
   },
   "devDependencies": {
     "electron": "^43.2.0",
-    "electron-builder": "^26.15.3",
-    "ws": "^8.21.1"
+    "electron-builder": "^26.15.3"
   },
   "dependencies": {
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.9",
+    "ws": "^8.21.1"
   }
 }
