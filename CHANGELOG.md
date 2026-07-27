@@ -3,6 +3,10 @@
 Notes orientées utilisateur : c'est le texte affiché dans le pop-up de mise à
 jour. Une entrée par version publiée, la plus récente en haut.
 
+## 0.1.10
+
+- Le copilote d'appel se fond totalement dans la page (fond transparent) — plus aucune différence de couleur entre les deux zones.
+
 ## 0.1.9
 
 - Le copilote d'appel s'accorde à ton thème clair/sombre et se fond dans la page (fini le « cadre dans un cadre »).

@@ -27,12 +27,14 @@ let attached = false;
 let lastBounds = { x: 0, y: 0, width: 0, height: 0 };
 let lastTheme = "dark";
 
-// Palettes = tokens du SaaS. --bg = fond de PAGE (le cockpit s'y fond) ;
-// --panel = surface (cartes internes qui ressortent).
+// Palettes = tokens du SaaS. --bg = TRANSPARENT : le cockpit n'a plus de fond
+// propre, c'est la PAGE SaaS (derrière) qui transparaît → zéro écart de couleur
+// possible entre les deux fonds, et le thème est suivi automatiquement. --panel
+// = surface (cartes internes qui ressortent), --fg/--line = texte/bordures.
 const VARS_DARK =
-  "--bg:#08090A;--panel:#101012;--fg:#E3E4E6;--muted:#8A8F98;--faint:rgba(138,143,152,.55);--line:#26262B;--btn-fg:#08090A;";
+  "--bg:transparent;--panel:#101012;--fg:#E3E4E6;--muted:#8A8F98;--faint:rgba(138,143,152,.55);--line:#26262B;--btn-fg:#08090A;";
 const VARS_LIGHT =
-  "--bg:#F1F1F3;--panel:#FFFFFF;--fg:#171717;--muted:#666666;--faint:rgba(102,102,102,.5);--line:#DEDEE1;--btn-fg:#F1F1F3;";
+  "--bg:transparent;--panel:#FFFFFF;--fg:#171717;--muted:#666666;--faint:rgba(102,102,102,.5);--line:#DEDEE1;--btn-fg:#F1F1F3;";
 
 const COCKPIT_CSS =
   `:root{${VARS_DARK}}` + // défaut sombre
@@ -90,7 +92,7 @@ function show(bounds, theme) {
     view = new WebContentsView({
       webPreferences: { contextIsolation: true, nodeIntegration: false },
     });
-    view.setBackgroundColor("#08090A"); // fond page (sombre) : zéro flash blanc
+    view.setBackgroundColor("#00000000"); // TRANSPARENT : la page SaaS transparaît
     view.webContents.loadFile(launcherFile);
     view.webContents.setWindowOpenHandler(({ url }) => {
       shell.openExternal(url);
