@@ -614,6 +614,32 @@ if (!gotLock) {
       bridgeSend({ type: "set_setting", key, value });
       return ok;
     });
+    // Sélecteur de prospect du cockpit (STRUCTURE — le lien appel→prospect sera
+    // fait côté runtime par Eliott). Liste via le SaaS (session réutilisée),
+    // « + Nouveau » → page /prospects/new, sélection → relayée au runtime.
+    ipcMain.handle("prospects:list", async () => {
+      try {
+        const res = await net.fetch(`${SAAS_ORIGIN}/api/desktop/prospects`, {
+          session: mainWindow?.webContents.session,
+          cache: "no-store",
+        });
+        if (!res.ok) return [];
+        const j = await res.json();
+        return Array.isArray(j.prospects) ? j.prospects : [];
+      } catch {
+        return [];
+      }
+    });
+    ipcMain.on("prospects:new", () => {
+      if (mainWindow) mainWindow.loadURL(`${SAAS_ORIGIN}/prospects/new`);
+    });
+    ipcMain.on("prospect:selected", (_e, data) => {
+      bridgeSend({
+        type: "prospect_selected",
+        id: data?.id,
+        label: data?.label,
+      });
+    });
     // Cockpit d'Eliott intégré dans la page : le SaaS indique la région, on y
     // pose la vue + on démarre le CERVEAU SEUL (zéro écoute tant que LE bouton
     // du cockpit n'est pas cliqué).

@@ -3,6 +3,10 @@
 Notes orientées utilisateur : c'est le texte affiché dans le pop-up de mise à
 jour. Une entrée par version publiée, la plus récente en haut.
 
+## 0.1.13
+
+- Sur l'écran de préparation, « Qui vas-tu appeler ? » devient un sélecteur de prospect (avec « + Nouveau prospect »). Le rattachement de l'appel au prospect arrive bientôt.
+
 ## 0.1.12
 
 - Les réglages du copilote quittent l'écran de préparation : ils sont maintenant dans Paramètres → « Copilote d'appel » (thème, fond de l'overlay, oreille, sensibilité). L'écran de préparation est plus épuré.

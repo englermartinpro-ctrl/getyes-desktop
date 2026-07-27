@@ -50,6 +50,37 @@ const COCKPIT_CSS =
   ".settings{display:none!important}" +
   ".bottom-bar{display:none!important}";
 
+// Sélecteur de prospect (STRUCTURE) : remplace le champ texte « Qui vas-tu
+// appeler ? » par une liste déroulante des prospects (via le SaaS) + « Nouveau ».
+// On garde le textarea d'Eliott CACHÉ et on le pilote (valeur + event change) →
+// le mécanisme prospect_note existant part sans rien changer côté runtime. La
+// sélection est aussi relayée (selectProspect) pour le futur lien appel→prospect.
+const SELECTOR_JS = `(async function(){
+  if (document.getElementById('gyProspectSelect')) return;
+  var ta = document.getElementById('prospectNotes');
+  if (!ta || !ta.parentElement || !window.getyesCockpit) return;
+  var sel = document.createElement('select');
+  sel.id = 'gyProspectSelect';
+  sel.style.cssText = 'width:100%;padding:12px 14px;border-radius:12px;background:var(--panel);color:var(--fg);border:1px solid var(--line);font:inherit;font-size:14px;outline:none;cursor:pointer;';
+  var o0 = document.createElement('option'); o0.value=''; o0.textContent='Qui vas-tu appeler ? — choisis un prospect'; sel.appendChild(o0);
+  var oNew = document.createElement('option'); oNew.value='__new__'; oNew.textContent='+ Nouveau prospect'; sel.appendChild(oNew);
+  try {
+    var list = await window.getyesCockpit.listProspects();
+    for (var i=0;i<list.length;i++){ var o=document.createElement('option'); o.value=list[i].id; o.textContent=list[i].label; sel.insertBefore(o, oNew); }
+  } catch(e){}
+  sel.addEventListener('change', function(){
+    if (sel.value==='__new__'){ window.getyesCockpit.openNewProspect(); sel.value=''; return; }
+    if (sel.value){
+      var label = sel.options[sel.selectedIndex].textContent;
+      ta.value = 'Prospect : ' + label;
+      ta.dispatchEvent(new Event('change', { bubbles: true }));
+      window.getyesCockpit.selectProspect(sel.value, label);
+    }
+  });
+  ta.style.display='none';
+  ta.parentElement.insertBefore(sel, ta);
+})();`;
+
 function init(win, runtimeDir) {
   mainWindow = win;
   launcherFile = path.join(runtimeDir, "closepilot_ui", "src", "launcher.html");
@@ -92,7 +123,11 @@ function show(bounds, theme) {
   if (theme) lastTheme = theme === "light" ? "light" : "dark";
   if (!view) {
     view = new WebContentsView({
-      webPreferences: { contextIsolation: true, nodeIntegration: false },
+      webPreferences: {
+        preload: path.join(__dirname, "cockpit-preload.js"),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
     });
     view.setBackgroundColor("#00000000"); // TRANSPARENT : la page SaaS transparaît
     view.webContents.loadFile(launcherFile);
@@ -105,6 +140,7 @@ function show(bounds, theme) {
       if (!view) return;
       view.webContents.insertCSS(COCKPIT_CSS).catch(() => {});
       applyTheme(lastTheme);
+      view.webContents.executeJavaScript(SELECTOR_JS).catch(() => {});
       attach();
     });
   } else {
