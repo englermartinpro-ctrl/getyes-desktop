@@ -13,6 +13,7 @@
   "build": {
     "appId": "com.getyes.app",
     "productName": "GetYes",
+    "artifactName": "${productName}-Setup-${version}.${ext}",
     "publish": [
       {
         "provider": "github",
