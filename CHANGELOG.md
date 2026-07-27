@@ -3,6 +3,10 @@
 Notes orientées utilisateur : c'est le texte affiché dans le pop-up de mise à
 jour. Une entrée par version publiée, la plus récente en haut.
 
+## 0.1.8
+
+- L'écran de préparation du copilote reste net quand tu ouvres les réglages (plus de texte coupé).
+
 ## 0.1.7
 
 - Le bouton « Démarrer l'outil de vente » lance maintenant vraiment l'écoute et l'assistant d'appel.
