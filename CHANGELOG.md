@@ -3,6 +3,10 @@
 Notes orientées utilisateur : c'est le texte affiché dans le pop-up de mise à
 jour. Une entrée par version publiée, la plus récente en haut.
 
+## 0.1.16
+
+- L'écran de préparation du copilote est reconstruit « maison » : mêmes couleurs que le reste de l'app, boutons qui marchent (réglages, nouveau prospect), sélecteur de prospect intégré. Plus de fond qui dépareille.
+
 ## 0.1.15
 
 - L'écran de préparation garde un bouton « Réglages du copilote » qui ouvre directement Paramètres → Copilote d'appel (au lieu du panneau qui se dépliait).

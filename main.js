@@ -605,6 +605,40 @@ if (!gotLock) {
     ipcMain.handle("copilot:toggle", () => toggleCopilot());
     ipcMain.handle("copilot:isRunning", () => runtime.isRunning());
     ipcMain.handle("copilot:state", () => copilotState);
+    // ── Cockpit NATIF (écran de préparation recodé dans le SaaS) ──────────────
+    // prepare : démarre le CERVEAU seul (zéro écoute) + le pont, à l'ouverture de
+    // la page Copilote. statusFull : état lu par l'UI native (cerveau + oreille).
+    ipcMain.handle("copilot:prepare", () => {
+      runtime.start({ brainOnly: true });
+      if (copilotState === "off") startBridge();
+      return true;
+    });
+    ipcMain.handle("copilot:statusFull", () => ({
+      state: copilotState,
+      ear: runtime.earRunning(),
+    }));
+    // startListening : LE bouton natif → fiche prospect (contexte IA) + oreille +
+    // overlay. Le prospect choisi est relayé pour le futur lien appel→prospect.
+    ipcMain.handle("copilot:startListening", (_e, p) => {
+      if (p?.label) bridgeSend({ type: "prospect_note", note: `Prospect : ${p.label}` });
+      if (p?.prospectId) {
+        bridgeSend({ type: "prospect_selected", id: p.prospectId, label: p.label });
+      }
+      if (p?.mode) bridgeSend({ type: "set_setting", key: "session_mode", value: p.mode });
+      runtime.startEar();
+      createOverlayWindow().showInactive();
+      setCopilotState("ready");
+      updateTray();
+      return true;
+    });
+    // endCall : raccrocher → bilan (reset_session) + coupe l'oreille + ferme l'overlay.
+    ipcMain.handle("copilot:endCall", () => {
+      bridgeSend({ type: "reset_session" });
+      runtime.stopEar();
+      overlayWindow?.hide();
+      updateTray();
+      return true;
+    });
     // Réglages du copilote (Paramètres → Copilote d'appel) : lus/écrits dans
     // getyes_settings.json ; l'écriture est aussi relayée À CHAUD au runtime via
     // le pont WS (set_setting) s'il tourne — mêmes clés que le cockpit d'Eliott.

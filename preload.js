@@ -24,6 +24,13 @@ contextBridge.exposeInMainWorld("getyesDesktop", {
     toggle: () => ipcRenderer.invoke("copilot:toggle"),
     isRunning: () => ipcRenderer.invoke("copilot:isRunning"),
     state: () => ipcRenderer.invoke("copilot:state"), // off | starting | ready
+    // Cockpit NATIF (écran recodé dans le SaaS) : préparer le cerveau, lire l'état
+    // complet (cerveau + oreille), démarrer l'écoute (LE bouton), raccrocher.
+    prepare: () => ipcRenderer.invoke("copilot:prepare"),
+    statusFull: () => ipcRenderer.invoke("copilot:statusFull"),
+    startListening: (payload) =>
+      ipcRenderer.invoke("copilot:startListening", payload),
+    endCall: () => ipcRenderer.invoke("copilot:endCall"),
   },
   // Cockpit d'Eliott intégré dans la page : le SaaS indique la région où le
   // process principal pose la vue (le vrai launcher.html, non modifié).
