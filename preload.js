@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld("getyesDesktop", {
     startListening: (payload) =>
       ipcRenderer.invoke("copilot:startListening", payload),
     endCall: () => ipcRenderer.invoke("copilot:endCall"),
+    reset: () => ipcRenderer.invoke("copilot:reset"),
   },
   // Cockpit d'Eliott intégré dans la page : le SaaS indique la région où le
   // process principal pose la vue (le vrai launcher.html, non modifié).

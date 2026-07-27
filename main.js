@@ -639,6 +639,11 @@ if (!gotLock) {
       updateTray();
       return true;
     });
+    // reset : « nouvel appel » → bilan + session vierge, SANS couper l'écoute.
+    ipcMain.handle("copilot:reset", () => {
+      bridgeSend({ type: "reset_session" });
+      return true;
+    });
     // Réglages du copilote (Paramètres → Copilote d'appel) : lus/écrits dans
     // getyes_settings.json ; l'écriture est aussi relayée À CHAUD au runtime via
     // le pont WS (set_setting) s'il tourne — mêmes clés que le cockpit d'Eliott.

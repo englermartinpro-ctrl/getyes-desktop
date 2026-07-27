@@ -3,6 +3,10 @@
 Notes orientées utilisateur : c'est le texte affiché dans le pop-up de mise à
 jour. Une entrée par version publiée, la plus récente en haut.
 
+## 0.1.17
+
+- Le grand bouton « Démarrer l'outil de vente » retrouve son identité (grand, avec le reflet), et « Nouvel appel — remise à zéro » est de retour.
+
 ## 0.1.16
 
 - L'écran de préparation du copilote est reconstruit « maison » : mêmes couleurs que le reste de l'app, boutons qui marchent (réglages, nouveau prospect), sélecteur de prospect intégré. Plus de fond qui dépareille.
