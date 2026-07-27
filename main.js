@@ -640,6 +640,10 @@ if (!gotLock) {
         label: data?.label,
       });
     });
+    // Bouton « Réglages du copilote » du cockpit → ouvre Paramètres, onglet Copilote.
+    ipcMain.on("cockpit:openSettings", () => {
+      if (mainWindow) mainWindow.loadURL(`${SAAS_ORIGIN}/settings#copilote`);
+    });
     // Cockpit d'Eliott intégré dans la page : le SaaS indique la région, on y
     // pose la vue + on démarre le CERVEAU SEUL (zéro écoute tant que LE bouton
     // du cockpit n'est pas cliqué).

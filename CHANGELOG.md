@@ -3,6 +3,10 @@
 Notes orientées utilisateur : c'est le texte affiché dans le pop-up de mise à
 jour. Une entrée par version publiée, la plus récente en haut.
 
+## 0.1.15
+
+- L'écran de préparation garde un bouton « Réglages du copilote » qui ouvre directement Paramètres → Copilote d'appel (au lieu du panneau qui se dépliait).
+
 ## 0.1.14
 
 - Le copilote d'appel a exactement le même fond que le reste de l'app — plus aucune différence de couleur (couleur solide, garantie).

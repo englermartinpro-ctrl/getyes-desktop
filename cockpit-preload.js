@@ -9,4 +9,6 @@ contextBridge.exposeInMainWorld("getyesCockpit", {
   openNewProspect: () => ipcRenderer.send("prospects:new"),
   selectProspect: (id, label) =>
     ipcRenderer.send("prospect:selected", { id, label }),
+  // Bouton « Réglages du copilote » du cockpit → ouvre Paramètres (onglet Copilote).
+  openSettings: () => ipcRenderer.send("cockpit:openSettings"),
 });

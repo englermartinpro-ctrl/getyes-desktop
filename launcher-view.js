@@ -48,10 +48,28 @@ const COCKPIT_CSS =
   ".action{zoom:1.1!important;justify-content:flex-start!important;" +
   "gap:16px!important;padding:26px 44px!important;max-width:680px!important;" +
   "flex:0 1 780px!important}" +
-  // Réglages RETIRÉS du cockpit (ils vivent dans Paramètres → Copilote d'appel) :
-  // panneau dépliable + barre du bas (engrenage + lien) masqués.
+  // Panneau dépliable retiré + engrenage d'Eliott et lien débrief masqués. La
+  // barre du bas RESTE : on y injecte un bouton « Réglages du copilote » qui
+  // renvoie aux Paramètres (les réglages y vivent maintenant).
   ".settings{display:none!important}" +
-  ".bottom-bar{display:none!important}";
+  ".bottom-bar .hint{display:none!important}" +
+  "#gearBtn{display:none!important}";
+
+// Bouton « Réglages du copilote » (STRUCTURE demandée) : un LIEN vers les
+// Paramètres (onglet Copilote), pas un dépliable. Injecté dans la barre du bas.
+const SETTINGS_LINK_JS = `(function(){
+  if (document.getElementById('gyOpenSettings')) return;
+  var bar = document.querySelector('.bottom-bar');
+  if (!bar || !window.getyesCockpit) return;
+  var b = document.createElement('button');
+  b.id = 'gyOpenSettings'; b.type = 'button';
+  b.textContent = '\\u2699 R\\u00e9glages du copilote';
+  b.style.cssText = 'background:none;border:none;color:var(--muted);font:inherit;font-size:13px;text-decoration:underline;text-underline-offset:2px;cursor:pointer;padding:0;';
+  b.addEventListener('mouseenter', function(){ b.style.color='var(--fg)'; });
+  b.addEventListener('mouseleave', function(){ b.style.color='var(--muted)'; });
+  b.addEventListener('click', function(){ window.getyesCockpit.openSettings(); });
+  bar.appendChild(b);
+})();`;
 
 // Sélecteur de prospect (STRUCTURE) : remplace le champ texte « Qui vas-tu
 // appeler ? » par une liste déroulante des prospects (via le SaaS) + « Nouveau ».
@@ -144,6 +162,7 @@ function show(bounds, theme) {
       view.webContents.insertCSS(COCKPIT_CSS).catch(() => {});
       applyTheme(lastTheme);
       view.webContents.executeJavaScript(SELECTOR_JS).catch(() => {});
+      view.webContents.executeJavaScript(SETTINGS_LINK_JS).catch(() => {});
       attach();
     });
   } else {
