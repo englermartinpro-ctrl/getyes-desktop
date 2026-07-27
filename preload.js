@@ -26,8 +26,10 @@ contextBridge.exposeInMainWorld("getyesDesktop", {
   // Cockpit d'Eliott intégré dans la page : le SaaS indique la région où le
   // process principal pose la vue (le vrai launcher.html, non modifié).
   launcher: {
-    show: (bounds) => ipcRenderer.invoke("launcher:show", bounds),
+    // theme : "light" | "dark" du SaaS → le cockpit s'y accorde (fond, texte).
+    show: (bounds, theme) => ipcRenderer.invoke("launcher:show", bounds, theme),
     setBounds: (bounds) => ipcRenderer.send("launcher:bounds", bounds),
+    setTheme: (theme) => ipcRenderer.send("launcher:setTheme", theme),
     hide: () => ipcRenderer.send("launcher:hide"),
   },
 });

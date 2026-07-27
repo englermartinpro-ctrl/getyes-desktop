@@ -1,20 +1,20 @@
 // -----------------------------------------------------------------------------
 // Vue « cockpit » — le VRAI launcher d'Eliott, intégré au SaaS
 // -----------------------------------------------------------------------------
-// closepilot_ui/src/launcher.html est un fichier LOCAL. On l'affiche NON MODIFIÉ
-// (il garde 100 % de ses fonctions + sa connexion WS passe la garde d'Eliott, car
-// origine file://) dans une WebContentsView posée par-dessus la ZONE DE CONTENU de
-// la page Copilote — le menu GetYes reste autour. Le SaaS indique la région exacte
-// (IPC launcher:show / bounds / hide).
+// closepilot_ui/src/launcher.html affiché NON MODIFIÉ (garde ses fonctions + sa
+// connexion WS via origine file://) dans une WebContentsView posée sur la zone de
+// contenu de la page Copilote. Tout le style d'intégration passe par injection —
+// on ne touche JAMAIS aux fichiers d'Eliott.
 //
-// Deux soins, SANS toucher aux fichiers d'Eliott (tout par injection) :
-//  1) ANTI-FLASH : fond sombre + on n'ATTACHE la vue qu'une fois PEINTE — plus de
-//     flashbang blanc ni de contenu brut avant le style.
-//  2) INTÉGRATION : la palette dark du SaaS est réinjectée (le cockpit se fond dans
-//     son conteneur bg-surface au lieu de flotter comme une page à part), la colonne
-//     identité et la ligne « débrief getyes.app » (inopérante) sont masquées, et le
-//     zoom 1.28 qui coupait le bas est neutralisé (centrage « safe » + scroll de
-//     secours → plus rien n'est rogné).
+// Intégration :
+//  • Fond = celui de la PAGE SaaS (pas la surface) → plus de « rectangle dans un
+//    rectangle » : le cockpit se fond dans la page, les cartes internes (champ,
+//    bouton) ressortent en surface.
+//  • THEME-AWARE : suit le clair/sombre du SaaS. On injecte les deux palettes et
+//    on bascule une classe `gy-light` sur <html> (setTheme).
+//  • Anti-flash : fond sombre + on n'attache la vue qu'une fois peinte.
+//  • Colonne identité + ligne « débrief getyes.app » masquées ; zoom 1.28→1.1 +
+//    ancrage haut (les réglages ne croppent plus le bouton).
 // -----------------------------------------------------------------------------
 const { WebContentsView, shell } = require("electron");
 const path = require("path");
@@ -25,31 +25,25 @@ let mainWindow = null;
 let launcherFile = null;
 let attached = false;
 let lastBounds = { x: 0, y: 0, width: 0, height: 0 };
+let lastTheme = "dark";
 
-// = bg-surface du SaaS (thème sombre) : le fond de la vue ET du cockpit.
-const SURFACE = "#101012";
+// Palettes = tokens du SaaS. --bg = fond de PAGE (le cockpit s'y fond) ;
+// --panel = surface (cartes internes qui ressortent).
+const VARS_DARK =
+  "--bg:#08090A;--panel:#101012;--fg:#E3E4E6;--muted:#8A8F98;--faint:rgba(138,143,152,.55);--line:#26262B;--btn-fg:#08090A;";
+const VARS_LIGHT =
+  "--bg:#F1F1F3;--panel:#FFFFFF;--fg:#171717;--muted:#666666;--faint:rgba(102,102,102,.5);--line:#DEDEE1;--btn-fg:#F1F1F3;";
 
 const COCKPIT_CSS =
-  // Palette dark du SaaS (surface / surface-hover / texte / bordure) → cohérence.
-  ":root{" +
-  "--bg:#101012;--panel:#17171A;--fg:#E3E4E6;" +
-  "--muted:#8A8F98;--faint:rgba(138,143,152,.55);--line:#26262B;" +
-  "}" +
-  // Jamais de rognage : on laisse défiler si ça déborde (petites fenêtres).
+  `:root{${VARS_DARK}}` + // défaut sombre
+  `:root.gy-light{${VARS_LIGHT}}` + // basculé en clair
   "html,body{overflow-x:hidden!important;overflow-y:auto!important}" +
-  // Colonne identité masquée (logo/abo/conseil/liens = déjà dans le SaaS).
   ".hero{display:none!important}" +
   ".launcher{justify-content:center!important}" +
-  // Action centrée, zoom 1.28 → 1.1 (le 1.28 débordait), centrage SAFE (bascule
-  // en haut si trop grand → le bas n'est plus coupé), respiration resserrée.
-  // Ancrage HAUT (pas centré) : ouvrir les réglages fait défiler vers le bas
-  // sans jamais pousser/couper le bouton. Zoom 1.28 → 1.1 (le 1.28 débordait).
   ".action{zoom:1.1!important;justify-content:flex-start!important;" +
   "gap:16px!important;padding:26px 44px!important;max-width:680px!important;" +
   "flex:0 1 780px!important}" +
-  // Le panneau réglages défile dans SA boîte → n'allonge plus toute la colonne.
   ".settings{max-height:46vh!important;overflow-y:auto!important}" +
-  // « débrief complet de chaque appel → ton espace getyes.app » : retiré (inopérant).
   ".bottom-bar .hint{display:none!important}";
 
 function init(win, runtimeDir) {
@@ -66,7 +60,18 @@ function round(b) {
   };
 }
 
-// Attache la vue à la fenêtre (une fois seulement) et la cale sur la région.
+// Applique le thème (bascule la classe gy-light dans la page du cockpit).
+function applyTheme(theme) {
+  lastTheme = theme === "light" ? "light" : "dark";
+  if (!view) return;
+  const light = lastTheme === "light";
+  view.webContents
+    .executeJavaScript(
+      `document.documentElement.classList.toggle("gy-light", ${light});`,
+    )
+    .catch(() => {});
+}
+
 function attach() {
   if (!view || !mainWindow) return;
   if (!attached) {
@@ -77,30 +82,29 @@ function attach() {
 }
 
 // Affiche le cockpit à la région donnée (le crée à la 1re fois).
-function show(bounds) {
+function show(bounds, theme) {
   if (!mainWindow || !launcherFile || !fs.existsSync(launcherFile)) return false;
   lastBounds = round(bounds);
+  if (theme) lastTheme = theme === "light" ? "light" : "dark";
   if (!view) {
     view = new WebContentsView({
       webPreferences: { contextIsolation: true, nodeIntegration: false },
     });
-    // Fond sombre = surface du SaaS : la vue n'affiche JAMAIS de blanc avant le
-    // 1er paint (fin du flashbang) et se confond avec son conteneur.
-    view.setBackgroundColor(SURFACE);
+    view.setBackgroundColor("#08090A"); // fond page (sombre) : zéro flash blanc
     view.webContents.loadFile(launcherFile);
-    // Liens getyes.app (stats / compte / débrief) → navigateur système.
     view.webContents.setWindowOpenHandler(({ url }) => {
       shell.openExternal(url);
       return { action: "deny" };
     });
-    // On n'ATTACHE qu'une fois le contenu PEINT + le style d'intégration appliqué
-    // → aucun flash de contenu brut ni de thème par défaut.
+    // On attache seulement une fois peint + style + thème appliqués (pas de flash).
     view.webContents.once("did-finish-load", () => {
       if (!view) return;
       view.webContents.insertCSS(COCKPIT_CSS).catch(() => {});
+      applyTheme(lastTheme);
       attach();
     });
   } else {
+    applyTheme(lastTheme);
     attach();
   }
   return true;
@@ -109,6 +113,10 @@ function show(bounds) {
 function setBounds(bounds) {
   lastBounds = round(bounds);
   if (view && attached) view.setBounds(lastBounds);
+}
+
+function setTheme(theme) {
+  applyTheme(theme);
 }
 
 // Détache la vue (la garde vivante → ré-affichage instantané, sans re-flash).
@@ -125,4 +133,4 @@ function hide() {
 
 const isVisible = () => attached;
 
-module.exports = { init, show, setBounds, hide, isVisible };
+module.exports = { init, show, setBounds, setTheme, hide, isVisible };

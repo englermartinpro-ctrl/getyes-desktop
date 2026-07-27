@@ -603,14 +603,15 @@ if (!gotLock) {
     // Cockpit d'Eliott intégré dans la page : le SaaS indique la région, on y
     // pose la vue + on démarre le CERVEAU SEUL (zéro écoute tant que LE bouton
     // du cockpit n'est pas cliqué).
-    ipcMain.handle("launcher:show", (_e, bounds) => {
+    ipcMain.handle("launcher:show", (_e, bounds, theme) => {
       runtime.start({ brainOnly: true });
       // Le pont observe LE bouton (audio_toggle) → oreille + overlay. Démarré une
       // fois : re-naviguer vers Copilote ne le relance pas (garde sur "off").
       if (copilotState === "off") startBridge();
-      return launcherView.show(bounds);
+      return launcherView.show(bounds, theme);
     });
     ipcMain.on("launcher:bounds", (_e, bounds) => launcherView.setBounds(bounds));
+    ipcMain.on("launcher:setTheme", (_e, theme) => launcherView.setTheme(theme));
     ipcMain.on("launcher:hide", () => launcherView.hide());
 
     // Mises à jour automatiques (app packagée uniquement) : vérifie le flux de

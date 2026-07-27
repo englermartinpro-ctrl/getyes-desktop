@@ -3,6 +3,10 @@
 Notes orientées utilisateur : c'est le texte affiché dans le pop-up de mise à
 jour. Une entrée par version publiée, la plus récente en haut.
 
+## 0.1.9
+
+- Le copilote d'appel s'accorde à ton thème clair/sombre et se fond dans la page (fini le « cadre dans un cadre »).
+
 ## 0.1.8
 
 - L'écran de préparation du copilote reste net quand tu ouvres les réglages (plus de texte coupé).
