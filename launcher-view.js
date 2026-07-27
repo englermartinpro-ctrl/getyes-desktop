@@ -42,9 +42,13 @@ const COCKPIT_CSS =
   ".launcher{justify-content:center!important}" +
   // Action centrée, zoom 1.28 → 1.1 (le 1.28 débordait), centrage SAFE (bascule
   // en haut si trop grand → le bas n'est plus coupé), respiration resserrée.
-  ".action{zoom:1.1!important;justify-content:safe center!important;" +
+  // Ancrage HAUT (pas centré) : ouvrir les réglages fait défiler vers le bas
+  // sans jamais pousser/couper le bouton. Zoom 1.28 → 1.1 (le 1.28 débordait).
+  ".action{zoom:1.1!important;justify-content:flex-start!important;" +
   "gap:16px!important;padding:26px 44px!important;max-width:680px!important;" +
   "flex:0 1 780px!important}" +
+  // Le panneau réglages défile dans SA boîte → n'allonge plus toute la colonne.
+  ".settings{max-height:46vh!important;overflow-y:auto!important}" +
   // « débrief complet de chaque appel → ton espace getyes.app » : retiré (inopérant).
   ".bottom-bar .hint{display:none!important}";
 
