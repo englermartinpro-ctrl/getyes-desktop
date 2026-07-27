@@ -123,6 +123,31 @@ function writeCloserSettings(runtimeDir, closerId) {
   }
 }
 
+// Réglages du copilote (getyes_settings.json) lus/écrits depuis les Paramètres
+// du SaaS. Mêmes clés qu'Eliott (theme, bg, ear_mode, ear_sensitivity…). Le
+// runtime lit ce fichier au démarrage de l'oreille ; l'écriture à chaud est
+// relayée en plus via le pont WS (set_setting) côté main.
+function settingsFile() {
+  return path.join(config().runtimeDir, "getyes_settings.json");
+}
+function readSettings() {
+  try {
+    return JSON.parse(fs.readFileSync(settingsFile(), "utf8"));
+  } catch {
+    return {};
+  }
+}
+function writeSetting(key, value) {
+  const s = readSettings();
+  s[key] = value;
+  try {
+    fs.writeFileSync(settingsFile(), JSON.stringify(s, null, 2));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 let procs = [];
 let onLog = () => {};
 
@@ -242,4 +267,6 @@ module.exports = {
   setLogHandler,
   config,
   sweepKill,
+  readSettings,
+  writeSetting,
 };

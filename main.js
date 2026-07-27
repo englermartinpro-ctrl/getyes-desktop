@@ -605,6 +605,15 @@ if (!gotLock) {
     ipcMain.handle("copilot:toggle", () => toggleCopilot());
     ipcMain.handle("copilot:isRunning", () => runtime.isRunning());
     ipcMain.handle("copilot:state", () => copilotState);
+    // Réglages du copilote (Paramètres → Copilote d'appel) : lus/écrits dans
+    // getyes_settings.json ; l'écriture est aussi relayée À CHAUD au runtime via
+    // le pont WS (set_setting) s'il tourne — mêmes clés que le cockpit d'Eliott.
+    ipcMain.handle("settings:get", () => runtime.readSettings());
+    ipcMain.handle("settings:set", (_e, key, value) => {
+      const ok = runtime.writeSetting(key, value);
+      bridgeSend({ type: "set_setting", key, value });
+      return ok;
+    });
     // Cockpit d'Eliott intégré dans la page : le SaaS indique la région, on y
     // pose la vue + on démarre le CERVEAU SEUL (zéro écoute tant que LE bouton
     // du cockpit n'est pas cliqué).

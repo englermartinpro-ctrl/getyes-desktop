@@ -45,8 +45,10 @@ const COCKPIT_CSS =
   ".action{zoom:1.1!important;justify-content:flex-start!important;" +
   "gap:16px!important;padding:26px 44px!important;max-width:680px!important;" +
   "flex:0 1 780px!important}" +
-  ".settings{max-height:46vh!important;overflow-y:auto!important}" +
-  ".bottom-bar .hint{display:none!important}";
+  // Réglages RETIRÉS du cockpit (ils vivent dans Paramètres → Copilote d'appel) :
+  // panneau dépliable + barre du bas (engrenage + lien) masqués.
+  ".settings{display:none!important}" +
+  ".bottom-bar{display:none!important}";
 
 function init(win, runtimeDir) {
   mainWindow = win;

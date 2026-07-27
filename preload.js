@@ -34,4 +34,10 @@ contextBridge.exposeInMainWorld("getyesDesktop", {
     setTheme: (theme) => ipcRenderer.send("launcher:setTheme", theme),
     hide: () => ipcRenderer.send("launcher:hide"),
   },
+  // Réglages du copilote (Paramètres → Copilote d'appel) : lus/écrits dans le
+  // fichier local du runtime, relayés à chaud s'il tourne.
+  copilotSettings: {
+    get: () => ipcRenderer.invoke("settings:get"),
+    set: (key, value) => ipcRenderer.invoke("settings:set", key, value),
+  },
 });

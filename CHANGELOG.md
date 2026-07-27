@@ -3,6 +3,10 @@
 Notes orientées utilisateur : c'est le texte affiché dans le pop-up de mise à
 jour. Une entrée par version publiée, la plus récente en haut.
 
+## 0.1.12
+
+- Les réglages du copilote quittent l'écran de préparation : ils sont maintenant dans Paramètres → « Copilote d'appel » (thème, fond de l'overlay, oreille, sensibilité). L'écran de préparation est plus épuré.
+
 ## 0.1.11
 
 - Le numéro de version de l'app s'affiche maintenant en bas à droite des Paramètres — pour vérifier d'un coup d'œil qu'une mise à jour a bien été appliquée.
