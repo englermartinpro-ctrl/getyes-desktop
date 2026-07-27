@@ -3,6 +3,12 @@
 Notes orientées utilisateur : c'est le texte affiché dans le pop-up de mise à
 jour. Une entrée par version publiée, la plus récente en haut.
 
+## 0.1.18
+
+- L'écran de préparation retrouve toutes les vérifications (oreille, voix isolée, overlay, test micro) et l'info Setting / Closing.
+- Le sélecteur de prospect a une recherche et affiche la photo — plus facile de reconnaître qui on appelle.
+- Le reflet des boutons est plus lent, moins « éclair ».
+
 ## 0.1.17
 
 - Le grand bouton « Démarrer l'outil de vente » retrouve son identité (grand, avec le reflet), et « Nouvel appel — remise à zéro » est de retour.

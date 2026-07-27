@@ -40,6 +40,16 @@ let tray;
 let copilotState = "off"; // off | starting | ready — relu par le SaaS
 let bridgeWs = null;
 let bridgeTimer = null;
+// État complet du runtime capté sur le pont WS (pour la pré-flight native :
+// loopback, overlay, périphériques, résultat test micro, quota).
+let runtimeStatus = {
+  loopback: false,
+  overlay: false,
+  mic: null,
+  devices: [],
+  inputs: [],
+  quota: null,
+};
 
 // Retour OAuth : getyes://auth-callback?code=... → on recharge /auth/callback
 // DANS la fenêtre (là où vit le code_verifier PKCE posé au clic « Google »),
@@ -505,6 +515,19 @@ function startBridge() {
         setCopilotState("ready");
         updateTray();
       }
+      // Capture de l'état des composants (pré-flight native + test micro + quota).
+      if (d.type === "comp" && d.role === "ear") {
+        if ("loopback" in d) runtimeStatus.loopback = !!d.loopback;
+        if (Array.isArray(d.devices)) runtimeStatus.devices = d.devices;
+        if (Array.isArray(d.inputs)) runtimeStatus.inputs = d.inputs;
+      }
+      if (d.type === "comp" && d.role === "overlay") {
+        runtimeStatus.overlay = !!d.on;
+      }
+      if (d.type === "mic_check_result") {
+        runtimeStatus.mic = { ok: !!d.ok, error: !!d.error };
+      }
+      if (d.type === "response" && d.quota) runtimeStatus.quota = d.quota;
     });
     ws.on("close", () => {
       bridgeWs = null;
@@ -616,7 +639,22 @@ if (!gotLock) {
     ipcMain.handle("copilot:statusFull", () => ({
       state: copilotState,
       ear: runtime.earRunning(),
+      loopback: runtimeStatus.loopback,
+      overlay: !!(
+        overlayWindow &&
+        !overlayWindow.isDestroyed() &&
+        overlayWindow.isVisible()
+      ),
+      mic: runtimeStatus.mic,
+      quota: runtimeStatus.quota,
     }));
+    // Test micro : on efface le résultat précédent puis on demande la sonde ; le
+    // résultat (mic_check_result) revient en asynchrone, capté par le pont.
+    ipcMain.handle("copilot:micCheck", () => {
+      runtimeStatus.mic = null;
+      bridgeSend({ type: "mic_check" });
+      return true;
+    });
     // startListening : LE bouton natif → fiche prospect (contexte IA) + oreille +
     // overlay. Le prospect choisi est relayé pour le futur lien appel→prospect.
     ipcMain.handle("copilot:startListening", (_e, p) => {
