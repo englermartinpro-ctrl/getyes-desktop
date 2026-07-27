@@ -35,6 +35,7 @@ const UA_MARKER = "GetYesDesktop/0.1";
 let mainWindow;
 let overlayWindow;
 let updateWindow = null;
+let quittingForUpdate = false;
 let tray;
 let copilotState = "off"; // off | starting | ready — relu par le SaaS
 let bridgeWs = null;
@@ -138,6 +139,29 @@ function createWindow() {
       mainWindow.webContents.reload();
     }
   });
+
+  // Fermeture de la fenêtre : SANS appel actif (oreille éteinte), on QUITTE
+  // VRAIMENT. Crucial : sinon une fenêtre cachée (overlay) garde l'app vivante
+  // dans la zone de notification, et après une MAJ le verrou d'instance unique
+  // relance l'ANCIENNE au lieu de la neuve. Appel en cours → l'app reste vive
+  // (overlay + tray pilotent l'arrêt) ; la tray peut rouvrir la fenêtre.
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+    if (!quittingForUpdate && !runtime.earRunning()) app.quit();
+  });
+}
+
+// Ouvre (ou recrée) la fenêtre principale — appelée par la tray, y compris si la
+// fenêtre a été fermée pendant un appel (l'app tournait encore en arrière-plan).
+function openMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  } else {
+    createWindow();
+    launcherView.init(mainWindow, runtime.config().runtimeDir);
+  }
 }
 
 // Rend l'overlay déplaçable en réutilisant les zones data-tauri-drag-region
@@ -330,7 +354,13 @@ function createUpdateWindow(info) {
     });
   });
 
-  const onRelaunch = () => autoUpdater.quitAndInstall();
+  const onRelaunch = () => {
+    // On QUITTE d'abord tout ce qui garderait l'app vivante (overlay caché) puis
+    // on installe en SILENCE avec relance FORCÉE : l'ancienne instance meurt →
+    // l'installateur lance bien la NEUVE (plus de reprise de l'ancienne).
+    quittingForUpdate = true;
+    autoUpdater.quitAndInstall(true, true);
+  };
   const onLater = () => updateWindow && !updateWindow.isDestroyed() && updateWindow.close();
   const onResize = (_e, h) => {
     if (updateWindow && !updateWindow.isDestroyed()) {
@@ -404,12 +434,7 @@ function updateTray() {
     Menu.buildFromTemplate([
       {
         label: "Ouvrir GetYes",
-        click: () => {
-          if (mainWindow) {
-            mainWindow.show();
-            mainWindow.focus();
-          }
-        },
+        click: openMainWindow,
       },
       { type: "separator" },
       {
@@ -439,12 +464,7 @@ function updateTray() {
 function createTray() {
   if (tray) return;
   tray = new Tray(path.join(__dirname, "assets", "app-icon-v3.ico"));
-  tray.on("click", () => {
-    if (mainWindow) {
-      mainWindow.show();
-      mainWindow.focus();
-    }
-  });
+  tray.on("click", openMainWindow);
   updateTray();
 }
 
@@ -630,7 +650,9 @@ if (!gotLock) {
 
   app.on("will-quit", () => {
     globalShortcut.unregisterAll();
-    runtime.stop(); // ne jamais laisser un process runtime orphelin
+    // Ne stopper (taskkill/sweep) que si quelque chose tourne → quit instantané
+    // quand l'app était au repos. Le sweep de démarrage rattrape tout orphelin.
+    if (runtime.isRunning()) runtime.stop();
   });
 
   app.on("window-all-closed", () => {
