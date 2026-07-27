@@ -3,6 +3,10 @@
 Notes orientées utilisateur : c'est le texte affiché dans le pop-up de mise à
 jour. Une entrée par version publiée, la plus récente en haut.
 
+## 0.1.14
+
+- Le copilote d'appel a exactement le même fond que le reste de l'app — plus aucune différence de couleur (couleur solide, garantie).
+
 ## 0.1.13
 
 - Sur l'écran de préparation, « Qui vas-tu appeler ? » devient un sélecteur de prospect (avec « + Nouveau prospect »). Le rattachement de l'appel au prospect arrive bientôt.

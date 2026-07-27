@@ -31,10 +31,13 @@ let lastTheme = "dark";
 // propre, c'est la PAGE SaaS (derrière) qui transparaît → zéro écart de couleur
 // possible entre les deux fonds, et le thème est suivi automatiquement. --panel
 // = surface (cartes internes qui ressortent), --fg/--line = texte/bordures.
+// --bg = EXACTEMENT le fond de la zone de contenu du SaaS (bg-bg : #08090A
+// sombre / #F1F1F3 clair) → le cockpit a le même noir/blanc que la page, zéro
+// écart. Couleur SOLIDE (pas transparent) : rendu 100 % prévisible.
 const VARS_DARK =
-  "--bg:transparent;--panel:#101012;--fg:#E3E4E6;--muted:#8A8F98;--faint:rgba(138,143,152,.55);--line:#26262B;--btn-fg:#08090A;";
+  "--bg:#08090A;--panel:#101012;--fg:#E3E4E6;--muted:#8A8F98;--faint:rgba(138,143,152,.55);--line:#26262B;--btn-fg:#08090A;";
 const VARS_LIGHT =
-  "--bg:transparent;--panel:#FFFFFF;--fg:#171717;--muted:#666666;--faint:rgba(102,102,102,.5);--line:#DEDEE1;--btn-fg:#F1F1F3;";
+  "--bg:#F1F1F3;--panel:#FFFFFF;--fg:#171717;--muted:#666666;--faint:rgba(102,102,102,.5);--line:#DEDEE1;--btn-fg:#F1F1F3;";
 
 const COCKPIT_CSS =
   `:root{${VARS_DARK}}` + // défaut sombre
@@ -129,7 +132,7 @@ function show(bounds, theme) {
         nodeIntegration: false,
       },
     });
-    view.setBackgroundColor("#00000000"); // TRANSPARENT : la page SaaS transparaît
+    view.setBackgroundColor("#08090A"); // = bg-bg du SaaS (sombre) : même noir
     view.webContents.loadFile(launcherFile);
     view.webContents.setWindowOpenHandler(({ url }) => {
       shell.openExternal(url);
