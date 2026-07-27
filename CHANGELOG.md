@@ -3,6 +3,10 @@
 Notes orientées utilisateur : c'est le texte affiché dans le pop-up de mise à
 jour. Une entrée par version publiée, la plus récente en haut.
 
+## 0.1.11
+
+- Le numéro de version de l'app s'affiche maintenant en bas à droite des Paramètres — pour vérifier d'un coup d'œil qu'une mise à jour a bien été appliquée.
+
 ## 0.1.10
 
 - Le copilote d'appel se fond totalement dans la page (fond transparent) — plus aucune différence de couleur entre les deux zones.

@@ -12,7 +12,9 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("getyesDesktop", {
   isDesktop: true,
-  version: "0.1.0",
+  // Version RÉELLE de l'app, lue au chargement via IPC synchrone (remplace
+  // l'ancienne valeur en dur « 0.1.0 »). Sert au badge de version des Paramètres.
+  version: ipcRenderer.sendSync("app:version:sync"),
   platform: process.platform,
   // Pilotage du copilote depuis le SaaS (bouton « Lancer le copilote »). Le
   // process principal applique d'abord le gate Auth/abonnement avant de lancer.

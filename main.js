@@ -569,6 +569,11 @@ if (!gotLock) {
     runtime.sweepKill(); // tue tout runtime orphelin d'une session précédente
     Menu.setApplicationMenu(null);
     createTray();
+    // Version réelle de l'app → badge des Paramètres (lu par le preload en
+    // synchrone, donc enregistré AVANT le chargement de la fenêtre).
+    ipcMain.on("app:version:sync", (e) => {
+      e.returnValue = app.getVersion();
+    });
     createWindow();
     launcherView.init(mainWindow, runtime.config().runtimeDir);
 
