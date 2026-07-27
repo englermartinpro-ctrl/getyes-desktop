@@ -3,6 +3,10 @@
 Notes orientées utilisateur : c'est le texte affiché dans le pop-up de mise à
 jour. Une entrée par version publiée, la plus récente en haut.
 
+## 0.1.19
+
+- Réglages du copilote au complet dans Paramètres : taille et position de l'overlay, choix du haut-parleur écouté et du micro. « Ma voix de closer » arrive bientôt.
+
 ## 0.1.18
 
 - L'écran de préparation retrouve toutes les vérifications (oreille, voix isolée, overlay, test micro) et l'info Setting / Closing.

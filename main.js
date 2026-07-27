@@ -197,6 +197,20 @@ const OVERLAY_CROSS_JS = `(function(){
   document.body.appendChild(b);
 })();`;
 
+// Tailles de l'overlay (réglables dans Paramètres → Copilote).
+const OVERLAY_SIZES = { S: [440, 160], M: [560, 190], L: [700, 230] };
+// Applique la taille + la position stockées (getyes_settings.json) à l'overlay.
+function applyOverlayGeometry() {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  const st = runtime.readSettings();
+  const [w, h] = OVERLAY_SIZES[st.size] || OVERLAY_SIZES.M;
+  overlayWindow.setSize(w, h);
+  if (st.pos === "libre") return; // l'utilisateur le place lui-même (glisser)
+  const { width: sw } = screen.getPrimaryDisplay().workAreaSize;
+  const x = st.pos === "haut-droite" ? sw - w - 24 : Math.round((sw - w) / 2);
+  overlayWindow.setPosition(x, 24);
+}
+
 // ─── Overlay copilote ────────────────────────────────────────────────────────
 // Fenêtre flottante, sans cadre, transparente, toujours au-dessus (même sur Zoom).
 // Charge l'UI locale en file:// → passe la garde d'origine du serveur d'Eliott
@@ -231,6 +245,7 @@ function createOverlayWindow() {
   // INDÉTECTABLE en partage d'écran / capture (WDA_EXCLUDEFROMCAPTURE côté Windows) :
   // le prospect ne voit jamais l'overlay en visio. Feature clé qu'Eliott avait posée.
   overlayWindow.setContentProtection(true);
+  applyOverlayGeometry(); // taille + position choisies (Paramètres → Copilote)
   const cfg = runtime.config();
   const eliottOverlay = path.join(
     cfg.runtimeDir,
@@ -689,8 +704,14 @@ if (!gotLock) {
     ipcMain.handle("settings:set", (_e, key, value) => {
       const ok = runtime.writeSetting(key, value);
       bridgeSend({ type: "set_setting", key, value });
+      if (key === "size" || key === "pos") applyOverlayGeometry();
       return ok;
     });
+    // Périphériques audio détectés par le runtime (menus « Sortie » / « Micro »).
+    ipcMain.handle("settings:devices", () => ({
+      devices: runtimeStatus.devices,
+      inputs: runtimeStatus.inputs,
+    }));
     // Sélecteur de prospect du cockpit (STRUCTURE — le lien appel→prospect sera
     // fait côté runtime par Eliott). Liste via le SaaS (session réutilisée),
     // « + Nouveau » → page /prospects/new, sélection → relayée au runtime.

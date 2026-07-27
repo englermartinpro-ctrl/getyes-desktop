@@ -48,5 +48,6 @@ contextBridge.exposeInMainWorld("getyesDesktop", {
   copilotSettings: {
     get: () => ipcRenderer.invoke("settings:get"),
     set: (key, value) => ipcRenderer.invoke("settings:set", key, value),
+    devices: () => ipcRenderer.invoke("settings:devices"),
   },
 });
