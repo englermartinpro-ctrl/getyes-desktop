@@ -599,6 +599,13 @@ if (!gotLock) {
     // (champ "publish"). En dev, pas de flux → on ne l'appelle pas.
     if (app.isPackaged) {
       autoUpdater.on("update-downloaded", (info) => {
+        // SÉCURITÉ ANTI-BOUCLE : si la version « téléchargée » est DÉJÀ celle qui
+        // tourne, on ne propose rien. Sinon, en présence d'une install fantôme
+        // (2 copies à des chemins différents), on re-proposerait la MAJ à l'infini.
+        if (info?.version && info.version === app.getVersion()) {
+          console.log(`[updater] déjà en ${info.version} — pas de pop-up`);
+          return;
+        }
         // Comme Claude : l'app tourne encore sur l'ancienne version → pop-up maison
         // dépliable (Relancer / Plus tard, « Nouveautés » au clic). Sinon la MAJ
         // s'installe au prochain démarrage.
