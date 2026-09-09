@@ -225,11 +225,23 @@ function start(opts = {}) {
 
 // Démarre l'OREILLE (l'écoute) — séparément du cerveau, pour ne capter l'audio
 // qu'au moment où l'utilisateur active l'outil (LE bouton du cockpit).
-function startEar() {
+function startEar(earMode) {
   const cfg = config();
   if (cfg.mode !== "real" || !cfg.runtimeDir) return;
   if (procs.some((p) => p._gyEar)) return; // déjà en route
-  const ear = spawn(pythonFor(cfg.runtimeDir), ["-u", cfg.earScript], {
+  // 🎧 (09/09, retour Martin — « rien ne se passe » en test solo) : le mode
+  // d'écoute devient un CHOIX du cockpit, plus seulement un env de dev.
+  //  • "loopback" (défaut, appel réel) : la voix du PROSPECT sortant du casque
+  //    — le micro du closer n'est JAMAIS capté (l'IA ne s'embrouille pas, et
+  //    la voix du closer n'est pas enregistrée).
+  //  • "mic" (test solo) : le micro du closer JOUE le prospect.
+  const script =
+    earMode === "mic"
+      ? path.join("entrainement", "scripts", "_test_micro_on.py")
+      : earMode === "loopback"
+        ? "_ecoute_on.py"
+        : cfg.earScript; // sans choix explicite : l'env GETYES_EAR (dev) décide
+  const ear = spawn(pythonFor(cfg.runtimeDir), ["-u", script], {
     cwd: cfg.runtimeDir,
     env: { ...process.env, ...BRAIN_ENV },
     windowsHide: true,

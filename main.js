@@ -747,7 +747,10 @@ if (!gotLock) {
         bridgeSend({ type: "prospect_selected", id: p.prospectId, label: p.label });
       }
       if (p?.mode) bridgeSend({ type: "set_setting", key: "session_mode", value: p.mode });
-      runtime.startEar();
+      // 🎧 (09/09) mode d'écoute choisi dans le cockpit : "loopback" (appel
+      // réel — voix du prospect au casque) ou "mic" (test solo — le micro du
+      // closer joue le prospect).
+      runtime.startEar(p?.earMode);
       createOverlayWindow().showInactive();
       setCopilotState("ready");
       updateTray();
