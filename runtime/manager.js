@@ -87,8 +87,11 @@ function config() {
     mode: process.env.GETYES_RUNTIME_MODE || (present ? "real" : "mock"),
     runtimeDir,
     // Oreille : loopback (voix du prospect, appel réel) ou micro (test solo closer).
+    // (08/09) _test_micro_on.py a été rangé dans entrainement/scripts/ côté runtime.
     earScript:
-      process.env.GETYES_EAR === "mic" ? "_test_micro_on.py" : "_ecoute_on.py",
+      process.env.GETYES_EAR === "mic"
+        ? path.join("entrainement", "scripts", "_test_micro_on.py")
+        : "_ecoute_on.py",
   };
 }
 
@@ -96,11 +99,18 @@ function config() {
 // (créé en 3.11), sinon "python" (repli). Évite d'imposer un env à Martin.
 function pythonFor(runtimeDir) {
   if (process.env.GETYES_PYTHON) return process.env.GETYES_PYTHON;
-  const venv =
-    process.platform === "win32"
-      ? path.join(runtimeDir, ".venv", "Scripts", "python.exe")
-      : path.join(runtimeDir, ".venv", "bin", "python");
-  return fs.existsSync(venv) ? venv : "python";
+  // (08/09) le venv du runtime chez Martin s'appelle .venv311 (Python 3.11 —
+  // le python système 3.14 n'a pas les roues psycopg2/faster-whisper) : sans
+  // ce candidat, on retombait sur "python" système → crash immédiat du cerveau.
+  const noms = [".venv", ".venv311"];
+  for (const nom of noms) {
+    const venv =
+      process.platform === "win32"
+        ? path.join(runtimeDir, nom, "Scripts", "python.exe")
+        : path.join(runtimeDir, nom, "bin", "python");
+    if (fs.existsSync(venv)) return venv;
+  }
+  return "python";
 }
 
 // Pose le closer_id dans getyes_settings.json AVANT de démarrer le brain : il le
