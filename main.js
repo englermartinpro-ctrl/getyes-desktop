@@ -20,6 +20,7 @@ const {
 const path = require("path");
 const fs = require("fs");
 const runtime = require("./runtime/manager");
+const rapportPont = require("./runtime/rapport-pont");
 const { autoUpdater } = require("electron-updater");
 const WebSocket = require("ws");
 const launcherView = require("./launcher-view");
@@ -291,6 +292,36 @@ async function checkEntitlement() {
   }
 }
 
+// Jeton d'accès Supabase de la session de la fenêtre (cookies sb-…-auth-token,
+// éventuellement en morceaux .0/.1, valeur « base64-<json> ») — c'est LUI que
+// la route /api/rapport-appel attend en Bearer (seule route Bearer du SaaS).
+async function getAccessToken() {
+  try {
+    const jar = mainWindow?.webContents.session.cookies;
+    if (!jar) return null;
+    const cookies = await jar.get({ url: SAAS_ORIGIN });
+    const morceaux = cookies
+      .filter((c) => /^sb-.*-auth-token(\.\d+)?$/.test(c.name))
+      .sort((a, b) => a.name.localeCompare(b.name, "en", { numeric: true }));
+    if (!morceaux.length) return null;
+    let brut = morceaux.map((c) => c.value).join("");
+    if (brut.startsWith("base64-")) {
+      brut = Buffer.from(brut.slice(7), "base64url").toString("utf8");
+    } else {
+      brut = decodeURIComponent(brut);
+    }
+    return JSON.parse(brut)?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Rafraîchit la session : un simple appel authentifié (cookies) suffit — le
+// middleware SaaS renouvelle les cookies au passage, puis on relit le jeton.
+async function rafraichirSession() {
+  await checkEntitlement();
+}
+
 function notifier(titre, corps) {
   try {
     new Notification({ title: titre, body: corps }).show();
@@ -413,6 +444,7 @@ async function startCopilot() {
   // ressources IA payantes). En mock (dev), rien n'est consommé → pas de gate,
   // pour pouvoir tester l'overlay sans être connecté dans la fenêtre.
   let closerId;
+  let secondes;
   if (!isMock) {
     const ent = await checkEntitlement();
     if (ent === null) {
@@ -434,8 +466,11 @@ async function startCopilot() {
       return { ok: false, reason: "entitlement" };
     }
     closerId = ent.closerId; // posé dans getyes_settings.json → fiche de vente
+    // 🧾 (09/09, pont P1) le solde du mois part au runtime : c'est LUI qui gère
+    // les avertissements 15/5/1 min et la coupure à zéro (décision Martin).
+    secondes = ent.secondesRestantes;
   }
-  const res = runtime.start({ closerId });
+  const res = runtime.start({ closerId, secondesRestantes: secondes });
   createOverlayWindow().showInactive();
   startBridge(); // suit l'état du runtime (démarrage → prêt) + met à jour la tray
   return res;
@@ -542,6 +577,12 @@ function startBridge() {
       if (d.type === "mic_check_result") {
         runtimeStatus.mic = { ok: !!d.ok, error: !!d.error };
       }
+      // 🧾 (09/09, pont P1) fin d'appel → le rapport part au SaaS TEL QUEL
+      // (idempotence par empreinte du corps, file persistée, backoff — voir
+      // runtime/rapport-pont.js et le contrat pont-rapport-appel.md).
+      if (d.type === "postcall_report" && d.report) {
+        rapportPont.recevoir(d.report);
+      }
       if (d.type === "response" && d.quota) runtimeStatus.quota = d.quota;
     });
     ws.on("close", () => {
@@ -614,6 +655,16 @@ if (!gotLock) {
     });
     createWindow();
     launcherView.init(mainWindow, runtime.config().runtimeDir);
+    // 🧾 (09/09, pont P1) rapports post-appel → SaaS : file persistée dans
+    // userData, reprise des envois qui n'ont pas pu partir la dernière fois.
+    rapportPont.init({
+      dossier: app.getPath("userData"),
+      origine: SAAS_ORIGIN,
+      obtenirToken: getAccessToken,
+      rafraichirSession,
+      log: (m) => console.log(m),
+    });
+    rapportPont.reprendre();
 
     // Runtime : logs en console + raccourci global de bascule du copilote +
     // IPC (bouton masquer overlay, et start/stop pilotables plus tard par le SaaS).
@@ -672,7 +723,25 @@ if (!gotLock) {
     });
     // startListening : LE bouton natif → fiche prospect (contexte IA) + oreille +
     // overlay. Le prospect choisi est relayé pour le futur lien appel→prospect.
-    ipcMain.handle("copilot:startListening", (_e, p) => {
+    ipcMain.handle("copilot:startListening", async (_e, p) => {
+      // 🧾 (09/09, pont P1) c'est ICI que les heures commencent à se consommer :
+      // re-vérification du quota (canUseRuntime) + solde FRAIS transmis au
+      // runtime (avertissements 15/5/1 min et coupure à zéro, côté runtime).
+      if (runtime.config().mode !== "mock") {
+        const ent = await checkEntitlement();
+        if (!ent || !ent.canUseRuntime) {
+          notifier(
+            "Copilote GetYes",
+            ent === null
+              ? "Service injoignable — réessaie dans un instant."
+              : ent.authenticated
+                ? "Quota d'heures épuisé ou plan sans copilote — vois ton abonnement."
+                : "Connecte-toi pour lancer le copilote.",
+          );
+          return { ok: false, reason: ent === null ? "unreachable" : "entitlement" };
+        }
+        runtime.writeSettings({ secondes_restantes: ent.secondesRestantes });
+      }
       if (p?.label) bridgeSend({ type: "prospect_note", note: `Prospect : ${p.label}` });
       if (p?.prospectId) {
         bridgeSend({ type: "prospect_selected", id: p.prospectId, label: p.label });

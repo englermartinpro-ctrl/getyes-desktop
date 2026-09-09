@@ -117,6 +117,12 @@ function pythonFor(runtimeDir) {
 // lit au boot pour charger la fiche de vente du bon compte (offers/closer_profile,
 // cf. Eliott §1.4). Merge non destructif (préserve les autres réglages).
 function writeCloserSettings(runtimeDir, closerId) {
+  writeSettingsDans(runtimeDir, { closer_id: closerId });
+}
+
+// 🧾 (09/09, pont P1) écriture GÉNÉRALE de réglages (merge non destructif) —
+// sert aussi à poser secondes_restantes (quota du mois) avant chaque écoute.
+function writeSettingsDans(runtimeDir, patch) {
   const file = path.join(runtimeDir, "getyes_settings.json");
   let settings = {};
   try {
@@ -124,14 +130,16 @@ function writeCloserSettings(runtimeDir, closerId) {
   } catch {
     settings = {}; // absent ou invalide → repart propre
   }
-  settings.closer_id = closerId;
+  Object.assign(settings, patch);
   try {
     fs.writeFileSync(file, JSON.stringify(settings, null, 2));
-    onLog("[manager] closer_id posé dans getyes_settings.json");
+    onLog(`[manager] réglages posés : ${Object.keys(patch).join(", ")}`);
   } catch (e) {
     onLog(`[manager] échec écriture getyes_settings.json : ${e.message}`);
   }
 }
+
+const writeSettings = (patch) => writeSettingsDans(config().runtimeDir, patch);
 
 // Réglages du copilote (getyes_settings.json) lus/écrits depuis les Paramètres
 // du SaaS. Mêmes clés qu'Eliott (theme, bg, ear_mode, ear_sensitivity…). Le
@@ -194,6 +202,10 @@ function start(opts = {}) {
   }
   const py = pythonFor(cfg.runtimeDir);
   if (opts.closerId) writeCloserSettings(cfg.runtimeDir, opts.closerId);
+  // 🧾 (09/09, pont P1) solde du mois → le runtime gère avertissements/coupure.
+  if (Number.isFinite(opts.secondesRestantes)) {
+    writeSettingsDans(cfg.runtimeDir, { secondes_restantes: opts.secondesRestantes });
+  }
 
   const env = { ...process.env, ...BRAIN_ENV };
   // 1) Cerveau + hub WebSocket (ws://127.0.0.1:8765). AUCUN audio ici.
@@ -275,6 +287,7 @@ module.exports = {
   isRunning,
   earRunning,
   setLogHandler,
+  writeSettings,
   config,
   sweepKill,
   readSettings,
