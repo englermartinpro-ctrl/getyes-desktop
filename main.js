@@ -742,7 +742,14 @@ if (!gotLock) {
         }
         runtime.writeSettings({ secondes_restantes: ent.secondesRestantes });
       }
-      if (p?.label) bridgeSend({ type: "prospect_note", note: `Prospect : ${p.label}` });
+      // 🗂 (11/09) fiche prospect COMPLÈTE si le cockpit l'a construite
+      // (statut, budget, source, notes du closer) — sinon le nom seul.
+      if (p?.brief || p?.label) {
+        bridgeSend({
+          type: "prospect_note",
+          note: p?.brief || `Prospect : ${p.label}`,
+        });
+      }
       if (p?.prospectId) {
         bridgeSend({ type: "prospect_selected", id: p.prospectId, label: p.label });
       }
