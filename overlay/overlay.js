@@ -81,12 +81,15 @@ function handle(msg) {
     case "partial":
       setState("streaming");
       stream += (stream ? " " : "") + msg.text;
+      phraseEl.classList.remove("clarification");
       setPhrase(stream, { streaming: true });
       break;
     case "response":
       setState("done");
       setPhrase(msg.phrase || stream);
-      setIntent(msg.intent || "");
+      // (14/09) demande de répétition : en rouge — le closer fait répéter, il ne lit pas
+      phraseEl.classList.toggle("clarification", msg.intent === "clarification");
+      setIntent(msg.intent === "clarification" ? "fais répéter" : msg.intent || "");
       renderMeta(msg);
       stream = "";
       break;

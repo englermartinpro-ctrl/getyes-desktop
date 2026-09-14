@@ -223,3 +223,8 @@ body {
   color: var(--fg);
   font-weight: 600;
 }
+
+/* (14/09) demande de répétition : le closer voit en rouge qu il doit faire répéter, pas lire une réponse */
+.phrase.clarification {
+  color: #e5484d;
+}

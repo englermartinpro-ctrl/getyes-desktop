@@ -668,7 +668,20 @@ if (!gotLock) {
 
     // Runtime : logs en console + raccourci global de bascule du copilote +
     // IPC (bouton masquer overlay, et start/stop pilotables plus tard par le SaaS).
-    runtime.setLogHandler((line) => console.log(line));
+    // (14/09) le journal du cerveau est aussi ÉCRIT sur disque (cerveau.log dans
+    // userData, plafonné à 5 Mo) : un test de Martin devient diagnosticable après coup.
+    const journalCerveau = path.join(app.getPath("userData"), "cerveau.log");
+    runtime.setLogHandler((line) => {
+      console.log(line);
+      try {
+        if (fs.existsSync(journalCerveau) && fs.statSync(journalCerveau).size > 5e6) {
+          fs.truncateSync(journalCerveau, 0);
+        }
+        fs.appendFileSync(journalCerveau, `${new Date().toISOString()} ${line}\n`);
+      } catch {
+        /* le journal ne doit jamais gêner le cerveau */
+      }
+    });
     globalShortcut.register("CommandOrControl+Shift+G", toggleCopilot);
     // Dev seulement : prévisualiser le pop-up de MAJ (avec le vrai CHANGELOG)
     // sans rien publier — pour valider le rendu avant une release.
