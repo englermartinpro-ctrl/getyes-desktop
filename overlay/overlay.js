@@ -29,6 +29,31 @@ function setPhrase(text, { placeholder = false, streaming = false } = {}) {
 function setIntent(text) {
   intentEl.textContent = text || "";
 }
+// (15/09) délai de lecture : une réponse affichée reste au moins le temps d'être lue
+// (2 s + 0,3 s par mot, 10 s max) ; une réponse qui arrive avant attend son tour.
+let lectureJusqua = 0;
+let reponseEnAttente = null;
+function afficherReponse(msg) {
+  const now = Date.now();
+  if (now < lectureJusqua) {
+    reponseEnAttente = msg;
+    setTimeout(() => {
+      if (reponseEnAttente === msg) afficherReponse(msg);
+    }, lectureJusqua - now);
+    return;
+  }
+  reponseEnAttente = null;
+  setState("done");
+  const texte = msg.phrase || stream;
+  setPhrase(texte);
+  // (14/09) demande de répétition : en rouge — le closer fait répéter, il ne lit pas
+  phraseEl.classList.toggle("clarification", msg.intent === "clarification");
+  setIntent(msg.intent === "clarification" ? "fais répéter" : msg.intent || "");
+  renderMeta(msg);
+  stream = "";
+  const mots = String(texte).trim().split(/\s+/).length;
+  lectureJusqua = Date.now() + Math.min(10000, 2000 + 300 * mots);
+}
 
 function chip(label, accent = false) {
   const el = document.createElement("span");
@@ -73,25 +98,29 @@ function handle(msg) {
       setPhrase("Prêt. J'écoute le prospect…", { placeholder: true });
       break;
     case "thinking":
+      // (15/09, rapport Martin) le texte en cours de lecture RESTE affiché pendant
+      // la réflexion — plus de « … » qui efface la phrase sur un bruit de bouche.
       setState("thinking");
       stream = "";
-      setPhrase("…", { placeholder: true });
       if (msg.objection) setIntent("objection : " + msg.objection);
       break;
     case "partial":
       setState("streaming");
       stream += (stream ? " " : "") + msg.text;
-      phraseEl.classList.remove("clarification");
-      setPhrase(stream, { streaming: true });
+      // la lecture de la phrase précédente est protégée : on n'écrase qu'après le délai
+      if (Date.now() >= lectureJusqua) {
+        phraseEl.classList.remove("clarification");
+        setPhrase(stream, { streaming: true });
+      }
       break;
     case "response":
-      setState("done");
-      setPhrase(msg.phrase || stream);
-      // (14/09) demande de répétition : en rouge — le closer fait répéter, il ne lit pas
-      phraseEl.classList.toggle("clarification", msg.intent === "clarification");
-      setIntent(msg.intent === "clarification" ? "fais répéter" : msg.intent || "");
-      renderMeta(msg);
-      stream = "";
+      if (msg.intent === "ignore") {
+        // bruit ignoré par le cerveau : on ne touche à rien
+        setState("done");
+        stream = "";
+        break;
+      }
+      afficherReponse(msg);
       break;
     case "postcall_report":
       setState("done");
