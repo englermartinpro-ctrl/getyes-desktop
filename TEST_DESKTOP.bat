@@ -12,5 +12,6 @@ rem   utiliser CE lanceur pour les tests, jusqu'a la prochaine release.
 rem ============================================================
 set GETYES_EAR=mic
 set DOSSIER_OFF=1
+set GETYES_DEV=1
 echo   Demarrage de GetYes Desktop en mode TEST (micro + fiche locale)...
 npm start
