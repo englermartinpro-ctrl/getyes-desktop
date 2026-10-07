@@ -24,7 +24,14 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/app-icon-v3.ico"
+      "icon": "assets/app-icon-v3.ico",
+      "signtoolOptions": {
+        "rfc3161TimeStampServer": "http://time.certum.pl",
+        "timeStampServer": "http://time.certum.pl",
+        "signingHashAlgorithms": [
+          "sha256"
+        ]
+      }
     },
     "nsis": {
       "oneClick": true,
