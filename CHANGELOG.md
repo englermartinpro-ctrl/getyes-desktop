@@ -3,6 +3,12 @@
 Notes orientées utilisateur : c'est le texte affiché dans le pop-up de mise à
 jour. Une entrée par version publiée, la plus récente en haut.
 
+## 0.2.5
+
+- Corrige la version 0.2.4, qui ne se lançait plus après la mise à jour.
+- Le copilote décompte ton forfait d'heures pendant l'appel : alertes à 15, 5 et 1 minute, puis fin d'appel propre.
+- L'oreille ne coupe plus une phrase en deux quand tu marques une pause.
+
 ## 0.1.19
 
 - Réglages du copilote au complet dans Paramètres : taille et position de l'overlay, choix du haut-parleur écouté et du micro. « Ma voix de closer » arrive bientôt.

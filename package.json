@@ -1,6 +1,6 @@
 {
   "name": "getyes-desktop",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "private": true,
   "description": "GetYes — application de bureau (Electron : SaaS embarqué + runtime local à venir)",
   "main": "main.js",
@@ -47,6 +47,15 @@
           "getyes"
         ]
       }
+    ],
+    "files": [
+      "**/*",
+      "!*.log",
+      "!**/*.log",
+      "!dist/**",
+      "!docs/**",
+      "!TEST_DESKTOP.bat",
+      "!README.md"
     ]
   },
   "devDependencies": {
