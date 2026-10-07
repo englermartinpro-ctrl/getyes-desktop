@@ -1,5 +1,8 @@
 # Signature Windows de l'installeur GetYes
 
+> **En attente (Martin, 06/10)** : pas de société immatriculée pour l'instant, donc pas de
+> certificat possible. Dossier prêt, à rouvrir dès que la structure existe. Priorité au produit.
+
 Pourquoi : sans signature, chaque nouvelle version est un fichier inconnu pour
 Windows SmartScreen. La réputation repart de zéro à chaque mise à jour et l'écran
 bleu « Windows a protégé votre ordinateur » revient. Avec un certificat, la
