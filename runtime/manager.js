@@ -66,12 +66,12 @@ function sweepKillEar() {
   sweepKillMatching("_ecoute_on|_test_micro_on|closepilot_live");
 }
 
-// Env du brain — aligné sur la spec d'Eliott (réponse du 26/07). Les CLÉS API
-// ne sont JAMAIS ici : elles vivent dans le supabase/.env du runtime.
-const BRAIN_ENV = {
-  SPEAKER_SLIM_MODEL: "claude-haiku-4-5-20251001",
-  BEST_OF_3: "1",
-};
+// Env du brain. Les CLÉS API ne sont JAMAIS ici : elles vivent dans le
+// supabase/.env du runtime. (08/10, brief Eliott) plus de modèle forcé : on
+// injectait SPEAKER_SLIM_MODEL=claude-haiku-4-5 → l'app 0.2.5 tournait sur
+// Haiku 4.5 au lieu du défaut du runtime (claude-haiku-5-5). BEST_OF_3 n'est
+// plus lu depuis le 22/09. Le runtime décide de son modèle.
+const BRAIN_ENV = {};
 
 function config() {
   // Dossier du runtime : env, sinon ~/getyes-runtime (le vrai chez Martin ; le

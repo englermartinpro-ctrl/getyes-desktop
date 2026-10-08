@@ -3,6 +3,12 @@
 Notes orientées utilisateur : c'est le texte affiché dans le pop-up de mise à
 jour. Une entrée par version publiée, la plus récente en haut.
 
+## 0.2.6
+
+- Le copilote utilise enfin le nouveau cerveau (Claude Haiku 5.5) : l'app forçait encore l'ancien modèle.
+- Les réponses arrivent plus vite, surtout la première de l'appel.
+- La réduction de bruit du micro est réglée sur « Moyen » par défaut.
+
 ## 0.2.5
 
 - Corrige la version 0.2.4, qui ne se lançait plus après la mise à jour.
