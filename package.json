@@ -8,7 +8,9 @@
   "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "publier": "node tools/publier.mjs publier --pct 10",
+    "verifier": "node tools/publier.mjs verifier"
   },
   "build": {
     "appId": "com.getyes.app",
@@ -55,7 +57,8 @@
       "!dist/**",
       "!docs/**",
       "!TEST_DESKTOP.bat",
-      "!README.md"
+      "!README.md",
+      "!tools/**"
     ]
   },
   "devDependencies": {
