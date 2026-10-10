@@ -33,8 +33,12 @@ const LATEST = join(DIST, "latest.yml");
 const ENV_PROPRE = { ...process.env };
 delete ENV_PROPRE.ELECTRON_RUN_AS_NODE;
 
+// Sous Windows on passe par le shell (npx/npm sont des .cmd) : il découpe les arguments
+// sur les espaces → « --title GetYes 0.2.6 » cassait la publication (10/10). On les cite.
+const SHELL = process.platform === "win32";
+const citer = (a) => (SHELL && /\s/.test(a) ? `"${a}"` : a);
 const lancer = (cmd, args, opts = {}) =>
-  execFileSync(cmd, args, { stdio: "inherit", shell: process.platform === "win32", env: ENV_PROPRE, ...opts });
+  execFileSync(cmd, args.map(citer), { stdio: "inherit", shell: SHELL, env: ENV_PROPRE, ...opts });
 
 function arg(nom, defaut) {
   const i = process.argv.indexOf(nom);
